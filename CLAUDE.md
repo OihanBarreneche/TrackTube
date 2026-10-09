@@ -8,6 +8,13 @@ another, and the traps that have already cost time.
 `README.md` describes the product from the point of view of whoever uses it.
 Here it is the point of view of whoever modifies it.
 
+Before committing agent work, use the identity of the agent that made the
+change: `Claude Code <noreply@anthropic.com>` for Claude, or
+`Codex (GPT-6) <codex@users.noreply.github.com>` for Codex. Set the repository's
+local Git identity accordingly and verify both author and committer. Never
+attribute an agent-created commit to the maintainer by inheriting the user's
+Git configuration. See `AGENTS.md`.
+
 ---
 
 ## Current state
