@@ -48,21 +48,21 @@
   <g filter="url(#shadow)"><rect x="550" y="42" width="460" height="436" rx="27" fill="#11101f" stroke="#514379" stroke-width="2"/></g>
   <g clip-path="url(#feed-clip)">
     <rect x="550" y="42" width="460" height="76" fill="#17142b"/>
-    <text x="583" y="90" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700">Subscriptions feed</text>
+    <text x="780" y="90" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700">Subscriptions feed</text>
     <rect x="583" y="132" width="50" height="30" rx="15" fill="#9d82fa"/>
-    <text x="600" y="152" fill="#141021" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">All</text>
+    <text x="608" y="152" text-anchor="middle" fill="#141021" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">All</text>
     <rect x="643" y="132" width="91" height="30" rx="15" fill="#25213c"/>
-    <text x="661" y="152" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">Priority</text>
+    <text x="688.5" y="152" text-anchor="middle" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">Priority</text>
     <rect x="744" y="132" width="113" height="30" rx="15" fill="#25213c"/>
-    <text x="759" y="152" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">In progress</text>
+    <text x="800.5" y="152" text-anchor="middle" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">In progress</text>
     <rect x="867" y="132" width="80" height="30" rx="15" fill="#25213c"/>
-    <text x="883" y="152" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">Hidden</text>
+    <text x="907" y="152" text-anchor="middle" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">Hidden</text>
 
     <image href="thumbnails/lake.jpg" x="583" y="182" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-1)"/>
     <circle cx="680" cy="197" r="11" fill="#11101f" fill-opacity=".82"/>
     <path d="M675 192l10 10m0-10l-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-    <text x="711" y="217" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Videos to watch</text>
-    <text x="711" y="241" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">From your subscriptions</text>
+    <text x="711" y="212" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Videos to watch</text>
+    <text x="711" y="236" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">From your subscriptions</text>
 
     <path d="M583 269h394" stroke="#302a48"/>
     <image href="thumbnails/road.jpg" x="583" y="285" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-2)"/>
@@ -71,8 +71,8 @@
     <path d="M599 292l2.4 5 5.5.7-4 3.9 1 5.5-4.9-2.6-4.9 2.6 1-5.5-4-3.9 5.5-.7z" fill="#ffc04d"/>
     <circle cx="680" cy="300" r="11" fill="#11101f" fill-opacity=".82"/>
     <path d="M675 295l10 10m0-10l-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
-    <text x="711" y="322" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Mark as priority</text>
-    <text x="711" y="346" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">Keep your picks close</text>
+    <text x="711" y="315" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Mark as priority</text>
+    <text x="711" y="339" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">Keep your picks close</text>
 
     <path d="M583 372h394" stroke="#302a48"/>
     <image href="thumbnails/city.jpg" x="583" y="388" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-3)"/>
@@ -89,20 +89,23 @@
 
   <!-- Three compact companion cards: filtering, analysis, channel review. -->
   <g filter="url(#shadow)"><rect x="1078" y="63" width="230" height="112" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
-  <rect x="1105" y="97" width="43" height="39" rx="9" fill="none" stroke="#a98df9" stroke-width="4"/>
-  <path d="M1119 105l18 12-18 12z" fill="#ad93ff"/><path d="M1102 141l49-49" stroke="#e8d9ff" stroke-width="5" stroke-linecap="round"/>
-  <text x="1169" y="112" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Shorts</text>
-  <text x="1169" y="139" fill="#cab8ff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">filtered</text>
+  <g transform="translate(21 0)">
+    <rect x="1105" y="97" width="43" height="39" rx="9" fill="none" stroke="#a98df9" stroke-width="4"/>
+    <path d="M1119 105l18 12-18 12z" fill="#ad93ff"/><path d="M1102 141l49-49" stroke="#e8d9ff" stroke-width="5" stroke-linecap="round"/>
+    <text x="1169" y="112" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Shorts</text>
+    <text x="1169" y="139" fill="#cab8ff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">filtered</text>
+  </g>
 
   <g filter="url(#shadow)"><rect x="1034" y="198" width="318" height="158" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
-  <text x="1059" y="235" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Watch history</text>
+  <text x="1193" y="235" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Watch history</text>
   <path d="M1069 329v-22m16 22v-37m16 37v-26m16 26v-49m16 49v-31m16 31v-57m16 57v-43" stroke="#977bf3" stroke-width="10" stroke-linecap="round"/>
   <path d="M1204 331h117" stroke="#5c507a" stroke-width="2"/>
   <path d="M1204 331v-23l17-11 17 13 17-23 17 12 17-30 17 9 15-21v74z" fill="url(#history-area)"/>
   <path d="M1204 308l17-11 17 13 17-23 17 12 17-30 17 9 15-21" fill="none" stroke="#b69dff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 
   <g filter="url(#shadow)"><rect x="1034" y="377" width="318" height="141" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
-  <text x="1059" y="413" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700">Sort your subscriptions</text>
+  <text x="1193" y="413" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700">Sort your subscriptions</text>
+  <g transform="translate(0 7)">
   <g transform="rotate(3 1194 459)">
     <rect x="1098" y="430" width="194" height="58" rx="12" fill="url(#review-card)" stroke="#746894" stroke-width="1.5"/>
     <circle cx="1125" cy="457" r="17" fill="#9d82fa"/>
@@ -116,4 +119,5 @@
   <path d="M1062 448l12 12m0-12l-12 12" fill="none" stroke="#ff7d8e" stroke-width="3" stroke-linecap="round"/>
   <circle cx="1318" cy="463" r="15" fill="#233a39" stroke="#8cddb9" stroke-width="1.5"/>
   <path d="M1310 463l5 5 11-12" fill="none" stroke="#8cddb9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
