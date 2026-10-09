@@ -109,14 +109,19 @@
   // are written from this side. Without a parameter the only way to see it was
   // to change the setting inside the installed extension.
   const benchLang = new URL(location.href).searchParams.get('lang');
-  // `?shot=popup` puts the frame at the popup's real size, in the corner,
-  // so `tools/shoot.py` can crop a known rectangle instead of hunting for it.
-  if (new URL(location.href).searchParams.get('shot') === 'popup') {
+  // The README crop keeps the popup at its native size. The Store shot scales
+  // that same live popup uniformly into the required 640x400 screenshot.
+  const shot = new URL(location.href).searchParams.get('shot');
+  if (shot === 'popup' || shot === 'store') {
     addEventListener('DOMContentLoaded', () => {
       const frame = document.querySelector('iframe');
-      Object.assign(frame.style, { position: 'fixed', left: '20px', top: '20px',
-        width: '400px', height: '600px', border: '0' });
+      Object.assign(frame.style, shot === 'store'
+        ? { position: 'fixed', left: '160px', top: '0', width: '400px',
+            height: '500px', border: '0', transform: 'scale(.8)', transformOrigin: 'top left' }
+        : { position: 'fixed', left: '20px', top: '20px',
+            width: '400px', height: '600px', border: '0' });
       document.body.style.background = '#0f0f0f';
+      if (shot === 'store') document.querySelector('.notes')?.remove();
     });
   }
 
@@ -165,7 +170,10 @@
     downloads: { async download() {} },
   };
 
-  const log = (t) => { document.getElementById('log').textContent += t + '\n'; };
+  const log = (t) => {
+    const target = document.getElementById('log');
+    if (target) target.textContent += t + '\n';
+  };
 
   // The popup is loaded as it is, inside an iframe whose context is populated
   // before its scripts run. `srcdoc` would not be enough: the scripts would

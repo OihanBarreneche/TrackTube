@@ -388,15 +388,15 @@
       banc.textContent += ` Statistiques recalculées en ${banc.dataset.calcul}.`;
     }, 200);
 
-    // `?shot=overview` frames the picture `tools/shoot.py` takes: from the eight
-    // headline figures down to the two rhythm charts, which is the stretch that
-    // says what the page is for.
+    // `?shot=overview` frames the README picture down to the rhythm charts.
+    // `?shot=store` ends after the trend so it fits a 1280x800 Store screenshot.
     //
     // The frame is a stylesheet and not one pass of `hidden`, because several
     // cards below start hidden and the page reveals them on its own once their
     // data lands — `#card-delays` among them. A card revealed after the frame
     // was set still carries no mark, so the rule still hides it.
-    if (new URL(location.href).searchParams.get('shot') === 'overview') {
+    const shot = new URL(location.href).searchParams.get('shot');
+    if (shot === 'overview' || shot === 'store') {
       const ready = setInterval(() => {
         const figures = document.getElementById('figures');
         const rhythm = document.getElementById('rhythm-grid');
@@ -408,7 +408,9 @@
         // range bar, the search and the three game cards are what sits directly
         // under `#results`, and marking at that level kept the whole view.
         const view = document.getElementById('view-global');
-        const last = rhythm.closest('section');
+        const last = shot === 'store'
+          ? document.getElementById('evolution').closest('section')
+          : rhythm.closest('section');
         let seen = false;
         for (const node of view.children) {
           if (node === figures) seen = true;
@@ -418,7 +420,10 @@
         document.head.append(Object.assign(document.createElement('style'), {
           textContent: '#results > :not(#view-global) { display: none !important }'
             + '#view-global > :not([data-shot-keep]) { display: none !important }'
-            + '#results { margin: 0 }',
+            + '#results { margin: 0 }'
+            // The synthetic fixture has no meaningful preceding period; its
+            // enormous relative deltas would misrepresent a real account.
+            + (shot === 'store' ? '#figures .delta { display: none !important }' : ''),
         }));
 
         // The card ends at its charts: the sittings and the summary line below

@@ -1,10 +1,9 @@
-"""Render the benches to PNG, at a size nobody's window has to be.
+"""Render the benches to PNG or JPEG at reproducible sizes.
 
-The screenshots that go in the README and in a store listing have a required
-size — 1280 x 800 for the Chrome Web Store — and capturing them by hand out of
-a browser window gives whatever that window happened to be. This drives a
-headless Chrome instead, so the same command gives the same pixels on any
-machine, and the crop is written down rather than aimed at.
+The README captures and Store captures serve different layouts. Chrome Web
+Store screenshots must be 1280 x 800 or 640 x 400, while the README can show
+the popup and longer history view at their natural sizes. This drives a headless
+Chrome so the same command gives the same pixels on any machine.
 
 It uses its own throwaway profile and never touches an installed one. The feed
 shot fetches real thumbnails from `i.ytimg.com`, so that one needs the network.
@@ -49,6 +48,9 @@ SHOTS = {
     'history': ('test/history-preview.html?lang=en&shot=overview', (1280, 1010), (0, 0, 1280, 990), 'png'),
     'triage': ('test/triage-preview.html?lang=en&thumbs&shot=drag', (1280, 800), None, 'jpg'),
     'popup': ('test/popup-preview.html?lang=en&shot=popup', (520, 700), (20, 20, 420, 520), 'png'),
+    # Store screenshots keep the real UI and fit Google's 1280x800 / 640x400 formats.
+    'history-store': ('test/history-preview.html?lang=en&shot=store', (1280, 800), None, 'png'),
+    'popup-store': ('test/popup-preview.html?lang=en&shot=store', (640, 400), None, 'png'),
 }
 
 
