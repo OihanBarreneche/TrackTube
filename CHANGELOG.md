@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 — 9 October 2026
+
+- Use English for the Chrome Web Store summary and small promotional image.
+- No runtime behavior or local database schema change from 1.1.0.
+
 ## 1.1.0 — 9 October 2026
 
 - Add three retrospective screens: comparison with the previous period, viewing

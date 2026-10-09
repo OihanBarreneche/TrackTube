@@ -17,8 +17,8 @@
   <path d="M43 96a33 33 0 1 0 12-33" fill="none" stroke="url(#ring)" stroke-width="11" stroke-linecap="round"/>
   <path d="M65 72v34l28-17z" fill="#f9f8ff"/>
   <text x="140" y="100" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="700" letter-spacing="-1">TrackTube</text>
-  <text x="27" y="184" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600">Vos abonnements YouTube,</text>
-  <text x="27" y="216" fill="#cdbdff" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600">dans l'ordre.</text>
+  <text x="27" y="184" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600">Your YouTube subscriptions,</text>
+  <text x="27" y="216" fill="#cdbdff" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600">in order.</text>
   <path d="M27 239h386" stroke="#675799" opacity=".45"/>
-  <text x="27" y="261" fill="#b7b0d2" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing=".5">FIL CHRONOLOGIQUE  ·  SANS RECOMMANDATIONS</text>
+  <text x="27" y="261" fill="#b7b0d2" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing=".5">CHRONOLOGICAL FEED  ·  NO RECOMMENDATIONS</text>
 </svg>
