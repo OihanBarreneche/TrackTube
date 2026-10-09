@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — mesure d'une séance</title>
+  <style>
+    body { font: 14px/1.6 system-ui; background: #0f0f0f; color: #f1f1f1; padding: 24px; }
+    li { margin: 3px 0; }
+    .ok::before { content: '✓ '; color: #4ade80; }
+    .ko::before { content: '✗ '; color: #f87171; }
+    .ko { color: #f87171; }
+    p { max-width: 780px; color: #bbb; }
+    #movie_player { display: none; }
+  </style>
+</head>
+<body>
+  <h1>Mesure d'une séance</h1>
+  <p>
+    Le suivi de lecture est piloté ici sur un faux lecteur&nbsp;: on fabrique la
+    suite d'événements <code>timeupdate</code> qu'une vraie lecture produirait,
+    y compris les sauts de curseur, les publicités et les enchaînements de
+    vidéos, et on regarde ce qui part vers le service worker. C'est la seule
+    façon de vérifier la mesure sans regarder une vidéo en entier à chaque
+    essai.
+  </p>
+  <p id="score">…</p>
+  <ul id="results"></ul>
+
+  <!-- The tracking anchors on YouTube's main player id: the fake player must
+       therefore carry it, otherwise nothing is measured. -->
+  <div id="movie_player"><video id="faux"></video></div>
+
+  <script type="module">
+    const results = document.getElementById('results');
+    let pass = 0, fail = 0;
+    const check = (label, ok, detail) => {
+      const li = document.createElement('li');
+      li.className = ok ? 'ok' : 'ko';
+      li.textContent = ok ? label : `${label} — ${JSON.stringify(detail ?? null)}`;
+      results.append(li);
+      ok ? pass++ : fail++;
+    };
+
+    // The page has to carry a video id: the tracking falls back on it when the
+    // player does not answer, as on a /watch page.
+    if (!new URL(location.href).searchParams.get('v')) {
+      location.replace(`${location.pathname}?v=aaaaaaaaaaa`);
+      throw new Error('redirection');
+    }
+
+    const envoyes = [];
+    let reglages = {};
+    globalThis.chrome = {
+      runtime: {
+        id: 'test',
+        sendMessage: async (msg) => { envoyes.push(msg); return { ok: true }; },
+        getURL: (p) => `../${p}`,
+      },
+      storage: { local: { get: async () => ({ 'ytfeed:settings': reglages }) } },
+    };
+
+    // A real video element, whose playhead is driven by hand.
+    const lecteur = document.getElementById('movie_player');
+    const media = document.getElementById('faux');
+    let position = 0;
+    let duree = 600;
+    Object.defineProperty(media, 'currentTime', { get: () => position, configurable: true });
+    Object.defineProperty(media, 'duration', { get: () => duree, configurable: true });
+    Object.defineProperty(media, 'playbackRate', { value: 1, configurable: true });
+
+    const avancer = (secondes, pas = 0.25) => {
+      for (let i = 0; i < secondes / pas; i++) {
+        position += pas;
+        media.dispatchEvent(new Event('timeupdate'));
+      }
+    };
+    /** Un saut de curseur : la position bouge d'un coup, sans lecture. */
+    const sauterA = (t) => { position = t; media.dispatchEvent(new Event('timeupdate')); };
+
+    const { installWatchTracking, nudgeWatchTracking, stopWatchTracking } =
+      await import('../src/content/watch-tracker.js');
+
+    // What the player would answer. The tests drive it: it is the player, and
+    // not the page's address, that decides which video is tracked.
+    const DETAILS_A = {
+      videoId: 'aaaaaaaaaaa', title: 'Une vidéo mesurée',
+      channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', channelTitle: 'Chaîne A', durationSec: 600,
+    };
+    let enLecture = 'aaaaaaaaaaa';
+    let details = DETAILS_A;
+    let pub = false;
+
+    installWatchTracking({
+      readPlayer: async () => ({
+        videoId: enLecture,
+        adShowing: pub,
+        details: details && details.videoId === enLecture ? details : null,
+      }),
+    });
+
+    const attendre = () => new Promise((r) => setTimeout(r, 30));
+    const records = () => envoyes.filter((m) => m.type === 'history:record');
+
+    /** Repart d'une page vierge : plus rien ne joue, plus rien n'est en cours. */
+    async function reinitialiser({ video = 'aaaaaaaaaaa', avec = DETAILS_A } = {}) {
+      stopWatchTracking();
+      await attendre();
+      envoyes.length = 0;
+      position = 0;
+      duree = 600;
+      pub = false;
+      enLecture = video;
+      details = avec;
+      nudgeWatchTracking();
+      await attendre();
+    }
+
+    await reinitialiser();
+    avancer(120);
+    stopWatchTracking();
+    await attendre();
+    check('réglage : aucune séance avant un consentement explicite', records().length === 0);
+    reglages = { liveHistory: true };
+
+    // -- nothing worth noting is written -----------------------------------
+    await reinitialiser();
+    avancer(3);
+    stopWatchTracking();
+    await attendre();
+    check('séance : trois secondes ne laissent aucune trace',
+      records().length === 0, records().length);
+
+    // -- an ordinary session -----------------------------------------------
+    await reinitialiser();
+    avancer(120);
+    stopWatchTracking();
+    await attendre();
+
+    const r = records().at(-1);
+    check('séance : une lecture suivie est consignée', Boolean(r), records().length);
+    check('séance : le temps mesuré est celui réellement parcouru',
+      Math.abs(r.watchedSec - 120) <= 1, r?.watchedSec);
+    check('séance : le titre et la chaîne accompagnent la mesure',
+      r.title === 'Une vidéo mesurée' && r.channelId === 'UCaaaaaaaaaaaaaaaaaaaaaa', r);
+    check('séance : la durée réelle de la vidéo est jointe',
+      r.durationSec === 600, r?.durationSec);
+    check('séance : l’horodatage est celui de l’ouverture, pas du rapport',
+      records().every((m) => m.watchedAt === records()[0].watchedAt),
+      records().map((m) => m.watchedAt));
+    check('séance : tous les rapports portent la même séance',
+      new Set(records().map((m) => `${m.videoId}|${m.watchedAt}`)).size === 1);
+
+    // -- a cursor jump does not manufacture watched time --------------------
+    await reinitialiser();
+    avancer(20);
+    sauterA(590);          // on tire la barre jusqu'à la fin
+    avancer(5);
+    stopWatchTracking();
+    await attendre();
+
+    const saut = records().at(-1);
+    check('séance : glisser jusqu’à la fin n’ajoute pas de temps regardé',
+      Math.abs(saut.watchedSec - 25) <= 1, saut?.watchedSec);
+    check('séance : la vidéo n’est pas déclarée vue pour autant',
+      saut.completed === false, saut?.completed);
+
+    // -- ce qui compte comme vue -------------------------------------------
+    await reinitialiser();
+    avancer(580, 1);
+    stopWatchTracking();
+    await attendre();
+    check('séance : une lecture quasi complète est déclarée vue',
+      records().at(-1).completed === true, records().at(-1));
+
+    // -- advertising does not count ----------------------------------------
+    // An ad occupies the same element as the video, with its own duration.
+    // Counting it would amount to declaring a barely opened video watched.
+    await reinitialiser();
+    avancer(10);
+    pub = true;
+    lecteur.classList.add('ad-showing');
+    duree = 15;
+    position = 0;
+    avancer(15);
+    lecteur.classList.remove('ad-showing');
+    pub = false;
+    duree = 600;
+    position = 10;
+    avancer(10);
+    stopWatchTracking();
+    await attendre();
+
+    const avecPub = records().at(-1);
+    check('publicité : le temps de l’annonce n’est pas compté',
+      Math.abs(avecPub.watchedSec - 20) <= 1.5, avecPub?.watchedSec);
+    check('publicité : une annonce vue en entier ne déclare pas la vidéo vue',
+      avecPub.completed === false, avecPub?.completed);
+    check('publicité : la durée jointe reste celle de la vidéo',
+      avecPub.durationSec === 600, avecPub?.durationSec);
+
+    // -- one video following another ---------------------------------------
+    // The case that lost viewings: the next video loads into the same element,
+    // and the closing write of the previous one must borrow nothing from it.
+    await reinitialiser();
+    avancer(300, 1);
+    const suivante = {
+      videoId: 'bbbbbbbbbbb', title: 'La suivante',
+      channelId: 'UCbbbbbbbbbbbbbbbbbbbbbb', channelTitle: 'Chaîne B', durationSec: 90,
+    };
+    enLecture = 'bbbbbbbbbbb';
+    details = suivante;
+    duree = 90;
+    position = 0;
+    media.dispatchEvent(new Event('loadstart'));
+    await attendre();
+    avancer(30, 1);
+    stopWatchTracking();
+    await attendre();
+
+    const parVideo = (id) => records().filter((m) => m.videoId === id);
+    check('enchaînement : les deux vidéos laissent chacune une séance',
+      parVideo('aaaaaaaaaaa').length > 0 && parVideo('bbbbbbbbbbb').length > 0,
+      records().map((m) => m.videoId));
+    check('enchaînement : la première garde sa propre durée',
+      parVideo('aaaaaaaaaaa').at(-1)?.durationSec === 600,
+      parVideo('aaaaaaaaaaa').at(-1)?.durationSec);
+    check('enchaînement : la première n’hérite pas du temps de la seconde',
+      Math.abs(parVideo('aaaaaaaaaaa').at(-1)?.watchedSec - 300) <= 2,
+      parVideo('aaaaaaaaaaa').at(-1)?.watchedSec);
+    check('enchaînement : la seconde est identifiée pour elle-même',
+      parVideo('bbbbbbbbbbb').at(-1)?.channelId === 'UCbbbbbbbbbbbbbbbbbbbbbb',
+      parVideo('bbbbbbbbbbb').at(-1));
+
+    // -- the player is authoritative, not the address ----------------------
+    // In miniplayer mode, the address no longer speaks of the video playing.
+    // Here it says `aaaaaaaaaaa` while the player is playing something else.
+    await reinitialiser({ video: 'ccccccccccc', avec: {
+      videoId: 'ccccccccccc', title: 'En mode réduit',
+      channelId: 'UCcccccccccccccccccccccc', channelTitle: 'Chaîne C', durationSec: 600,
+    } });
+    avancer(60);
+    stopWatchTracking();
+    await attendre();
+    check('mode réduit : la séance suit le lecteur et non l’adresse',
+      records().at(-1)?.videoId === 'ccccccccccc', records().at(-1)?.videoId);
+
+    // -- a late identification ---------------------------------------------
+    // The page sometimes takes a moment to say which video it is playing. The
+    // session opens all the same, and completes as soon as the answer comes.
+    await reinitialiser({ avec: null });
+    avancer(60);
+    details = DETAILS_A;
+    avancer(60);
+    stopWatchTracking();
+    await attendre();
+    check('identification tardive : la chaîne finit par rejoindre la séance',
+      records().at(-1)?.channelId === 'UCaaaaaaaaaaaaaaaaaaaaaa', records().at(-1));
+
+    // -- a title with no channel is sent all the same ----------------------
+    // The player alone does not know the channel id. The session is sent with
+    // what there is: the database will attach it, since it already knows the
+    // video from the subscription feed.
+    await reinitialiser({ avec: {
+      videoId: 'aaaaaaaaaaa', title: 'Titre seul',
+      channelId: null, channelTitle: 'Chaîne A', durationSec: 600,
+    } });
+    avancer(60);
+    stopWatchTracking();
+    await attendre();
+    const partiel = records().at(-1);
+    check('sans chaîne : la séance est tout de même consignée', Boolean(partiel),
+      records().length);
+    check('sans chaîne : le titre n’est pas jeté en route',
+      partiel?.title === 'Titre seul', partiel);
+
+    // -- setting switched off ------------------------------------------------
+    reglages = { liveHistory: false };
+    await reinitialiser();
+    avancer(120);
+    stopWatchTracking();
+    await attendre();
+    check('réglage : relevé coupé, plus rien n’est consigné',
+      records().length === 0, records().length);
+    check('réglage : le feed continue pourtant de savoir la vidéo vue',
+      envoyes.some((m) => m.type === 'feed:setWatched'),
+      envoyes.map((m) => m.type));
+
+    const score = document.getElementById('score');
+    score.textContent = fail ? `${fail} échec(s) sur ${pass + fail}` : `${pass} vérifications au vert`;
+    score.className = fail ? 'ko' : 'ok';
+  </script>
+</body>
+</html>

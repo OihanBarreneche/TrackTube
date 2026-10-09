@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <!-- The switch has left the feed's bar for the popup's header: one does not
+         swap between two feeds several times a visit, and in the bar it took
+         the room of the settings one actually touches. -->
+    <div class="header-left">
+      <button id="feed-toggle" class="switch" type="button" role="switch" aria-checked="true"
+              data-i18n-label="pop.toggle.title"
+              aria-label="Afficher mon feed à la place de celui de YouTube"></button>
+      <h1>TrackTube</h1>
+      <!-- The number of subscriptions followed sits against the title: it says
+           what the rest of the window is about, and has no business ending up
+           in a footer line next to the last collection's time. -->
+      <span id="stat-channels" class="count-pill" hidden></span>
+    </div>
+    <div class="header-right">
+      <button id="btn-docs" class="icon" data-i18n-label="pop.help" aria-label="Aide">?</button>
+      <button id="btn-settings" class="icon" data-i18n-label="pop.settings" aria-label="Réglages">⚙</button>
+    </div>
+  </header>
+
+  <section id="alarm" class="alarm" hidden></section>
+
+  <!-- ------------------------------------------------------------- feed --- -->
+  <main id="mode-feed" class="mode">
+    <!-- Three windows, from the shortest to the longest. The "to watch" total
+         that used to be here bounded nothing: in the thousands, it said no more
+         than how old the install was. -->
+    <div class="stats">
+      <button class="stat" data-opens-feed><b id="stat-day">—</b><span data-i18n="pop.window.day">sur 24 h</span></button>
+      <button class="stat" data-opens-feed><b id="stat-week">—</b><span data-i18n="pop.window.week">sur 7 j</span></button>
+      <button class="stat" data-opens-feed><b id="stat-month">—</b><span data-i18n="pop.window.month">sur 30 j</span></button>
+    </div>
+
+    <div id="onboarding" hidden>
+      <p class="lead" data-i18n="pop.import.lead">Commence par récupérer tes abonnements.</p>
+      <button id="btn-import" class="primary" data-i18n="pop.import.btn">Importer mes abonnements</button>
+      <p class="hint" data-i18n="pop.import.hint">Utilise ton onglet YouTube connecté.</p>
+    </div>
+
+    <div id="feed-ready" hidden>
+      <!-- The feed's views are reachable from here, with their count. The "Open
+           my feed" button that preceded them served no purpose: nobody needs an
+           extension to go to YouTube. -->
+      <div class="shortcuts">
+        <button class="shortcut" data-view="starred"><b id="short-starred">—</b><span data-i18n="feed.view.starred">★ Priorités</span></button>
+        <button class="shortcut" data-view="inprogress"><b id="short-inprogress">—</b><span data-i18n="feed.view.inprogress">En cours</span></button>
+        <button class="shortcut" data-view="hidden"><b id="short-hidden">—</b><span data-i18n="feed.view.hidden">Masquées</span></button>
+      </div>
+
+      <!-- A carousel rather than a dashboard: these figures serve no decision,
+           they show the volume coming in. -->
+      <section class="carousel" id="pulse">
+        <header>
+          <button id="pulse-prev" class="icon" data-i18n-label="pop.pulse.prev" aria-label="Vue précédente">‹</button>
+          <h3 id="pulse-title">—</h3>
+          <button id="pulse-next" class="icon" data-i18n-label="pop.pulse.next" aria-label="Vue suivante">›</button>
+        </header>
+        <div id="pulse-body" class="carousel-body"></div>
+      </section>
+
+      <p id="sync-line" class="hint centered"></p>
+      <div id="progress" class="progress" hidden>
+        <div class="bar"><i></i></div>
+        <span class="label"></span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ----------------------------------------------------------- triage --- -->
+  <main id="mode-triage" class="mode" hidden>
+    <p class="lead" data-i18n="pop.triage.lead">Passe tes abonnements en revue un par un, avec leurs dernières vidéos.</p>
+
+    <div class="stats">
+      <div class="stat"><b id="triage-done">—</b><span data-i18n="pop.triage.done">triées</span></div>
+      <div class="stat"><b id="triage-left">—</b><span data-i18n="pop.triage.left">restantes</span></div>
+    </div>
+
+    <button id="btn-triage" class="primary" data-i18n="pop.triage.btn">Trier mes abonnements</button>
+    <p class="hint centered" data-i18n="pop.triage.hint">
+      Les désabonnements se font au fil du tri, pas à la fin.
+    </p>
+
+    <!-- The same four figures at every opening, and not a hook drawn at
+         random: here one wants to know what is left to triage, not to be
+         surprised. Two progress numbers gave no reason to start; "forty two
+         channels silent for two years" does. -->
+    <div class="stats grid bottom">
+      <div class="stat"><b id="triage-week">—</b><span data-i18n="pop.tri.semaine">vidéos par semaine</span></div>
+      <div class="stat"><b id="triage-silent">—</b><span data-i18n="pop.tri.muettes">sans vidéo depuis deux ans</span></div>
+      <div class="stat"><b id="triage-never">—</b><span data-i18n="pop.tri.jamais">jamais regardées</span></div>
+      <div class="stat"><b id="triage-hidden">—</b><span data-i18n="pop.tri.masquees">presque toutes masquées</span></div>
+    </div>
+  </main>
+
+  <!-- ----------------------------------------------------------- history --- -->
+  <main id="mode-history" class="mode" hidden>
+    <p class="lead" data-i18n="pop.hist.lead">Ce que tu as réellement regardé, et depuis quand.</p>
+
+    <!-- `loading` until something real is known: reading the whole history
+         takes a moment on the first opening, and two motionless dashes read as
+         "nothing to show" rather than "not read yet". -->
+    <div class="stats loading" id="hist-stats">
+      <div class="stat"><b id="hist-count">—</b><span data-i18n="pop.hist.views">visionnages</span></div>
+      <div class="stat"><b id="hist-span">—</b><span data-i18n="pop.hist.span">couverts</span></div>
+    </div>
+
+    <!-- Two ways into the same data: the analysis aggregates, the detailed
+         history lists what was watched in order. One per line — side by side,
+         the second label wrapped in half a row. -->
+    <div class="button-row">
+      <button id="btn-history" class="primary" data-i18n="pop.hist.btn">Ouvrir l’analyse</button>
+      <button id="btn-journal" data-i18n="pop.hist.journal">Historique détaillé</button>
+    </div>
+    <p id="hist-measured" class="hint centered"></p>
+
+    <button class="highlight" id="acc-hist" hidden>
+      <b></b><span></span>
+    </button>
+
+    <!-- What concerns the history alone is set here, at the bottom of its own
+         tab. The settings hold for the whole extension and have no business
+         filling up with one feature's details; the room was free under the
+         button, and the setting is where one thinks of it. -->
+    <div class="mode-settings">
+      <label class="row">
+        <span data-i18n="set.releve.on">Relever ce que je regarde</span>
+        <input id="set-live-history" type="checkbox">
+      </label>
+      <p class="hint" data-i18n="set.releve.hint">Tout reste dans ce navigateur.</p>
+    </div>
+  </main>
+
+  <!-- --------------------------------------------------------- settings --- -->
+  <!-- A single list, the same whichever tab is open. Filtering them by mode
+       forced one to guess under which tab a setting had been filed before being
+       able to look for it. What holds for one feature only does not come in
+       here: it shows at the bottom of its own tab. -->
+  <div id="settings" class="sheet" hidden>
+    <header class="sheet-head">
+      <h2 id="settings-title" data-i18n="pop.settings">Réglages</h2>
+      <span class="version"></span>
+      <button id="btn-settings-close" class="icon" data-i18n-label="pop.close" aria-label="Fermer">✕</button>
+    </header>
+
+    <!-- The language opens the panel, outside the collapsible sections: it is
+         changed once, and one does not look for it under "Feed". -->
+    <div class="row global-row">
+      <span data-i18n="set.lang">Langue</span>
+      <select id="set-lang">
+        <option value="fr">Français</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <details open>
+      <summary data-i18n="set.filters">Ce qui entre dans le feed</summary>
+
+      <label class="row">
+        <span data-i18n="set.hidewatched">Retirer les vidéos regardées</span>
+        <input id="set-hide-watched" type="checkbox">
+      </label>
+
+      <label class="row" id="row-watched-percent">
+        <span data-i18n="set.watchedfrom">Vue à partir de</span>
+        <select id="set-watched-percent">
+          <option value="50" data-i18n="set.watchedfrom.50">50 %</option>
+          <option value="70">70 %</option>
+          <option value="80">80 %</option>
+          <option value="90">90 %</option>
+          <option value="95">95 %</option>
+          <option value="100" data-i18n="set.watchedfrom.100">la fin</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span data-i18n="set.inprogressfrom">« En cours » à partir de</span>
+        <select id="set-inprogress-min">
+          <option value="10" data-i18n="set.inprogressfrom.10">10 s</option>
+          <option value="30" data-i18n="set.secs.30">30 s</option>
+          <option value="60" data-i18n="set.mins.1">1 min</option>
+          <option value="120" data-i18n="set.mins.2">2 min</option>
+        </select>
+      </label>
+
+      <!-- "Minimum duration" left open what it was the duration of, and what it
+           did about it. It is the length below which a video does not enter the
+           feed at all. -->
+      <label class="row">
+        <span data-i18n="set.minduration">Écarter les vidéos de moins de</span>
+        <select id="set-min-duration">
+          <option value="0" data-i18n="set.nolimit">aucune limite</option>
+          <option value="60" data-i18n="set.mins.1">1 min</option>
+          <option value="120" data-i18n="set.mins.2">2 min</option>
+          <option value="180" data-i18n="set.mins.3">3 min</option>
+          <option value="240" data-i18n="set.mins.4">4 min</option>
+          <option value="300" data-i18n="set.mins.5">5 min</option>
+          <option value="600" data-i18n="set.mins.10">10 min</option>
+        </select>
+      </label>
+
+      <label class="row">
+        <span data-i18n="set.maxage">Profondeur du feed</span>
+        <select id="set-max-age">
+          <option value="0" data-i18n="set.maxage.0">tout</option>
+          <option value="2" data-i18n="set.maxage.2">2 jours</option>
+          <option value="7" data-i18n="set.maxage.7">7 jours</option>
+          <option value="14" data-i18n="set.maxage.14">14 jours</option>
+          <option value="30" data-i18n="set.maxage.30">30 jours</option>
+        </select>
+      </label>
+
+      <!-- The line saying that ★ priorities escape these filters was taken out.
+           The behaviour has not: a video marked priority stays in the feed
+           whatever is set here, which is what stops a depth of two days from
+           quietly taking away the very thing one had set aside. It simply does
+           not need saying — one only meets the case after having starred
+           something, and the star is then still there to be seen. -->
+
+      <!-- "Wait for the avatar and the duration" is no longer a setting: it is
+           the rule. A thumbnail with no duration is a thumbnail we do not know
+           how to show, and letting it through was the only way to see bare
+           videos in the feed. The grid's footer says how many are waiting. -->
+    </details>
+
+    <details>
+      <summary data-i18n="set.lives">Directs</summary>
+
+      <label class="row">
+        <span data-i18n="set.hidelives">Retirer les directs en cours</span>
+        <input id="set-hide-lives" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hidereplays">Retirer les rediffusions</span>
+        <input id="set-hide-replays" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hideupcoming">Retirer les diffusions programmées</span>
+        <input id="set-hide-upcoming" type="checkbox">
+      </label>
+
+    </details>
+
+    <details>
+      <summary data-i18n="set.hud">Ce que montre le feed</summary>
+
+      <label class="row">
+        <span data-i18n="set.hud.hide">✕ Masquer, sur les vignettes</span>
+        <input id="set-show-hide-button" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.star">★ Priorité, sur les vignettes</span>
+        <input id="set-show-star-button" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.selection">Mode sélection</span>
+        <input id="set-show-selection" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.viewall">Vue « Tout »</span>
+        <input id="set-show-view-all" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.viewstarred">Vue « ★ Priorités »</span>
+        <input id="set-show-view-starred" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.viewhidden">Vue « Masquées »</span>
+        <input id="set-show-view-hidden" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.viewinprogress">Vue « En cours »</span>
+        <input id="set-show-view-inprogress" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.search">Recherche</span>
+        <input id="set-show-search" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.columns">Réglage des colonnes</span>
+        <input id="set-show-columns" type="checkbox">
+      </label>
+      <label class="row">
+        <span data-i18n="set.hud.preview">Aperçu au survol</span>
+        <input id="set-show-preview" type="checkbox">
+      </label>
+
+      <p class="hint" data-i18n="set.hud.preview.hint">La vidéo se lance, muette. Le bas de la vignette la parcourt, et un clic y reprend la lecture.</p>
+
+      <!-- Two buttons rather than one more "minimal" setting: the bar has no
+           third state, and a toggle that cannot be undone line by line would
+           make liars of the nine checkboxes above. -->
+      <div class="row-actions">
+        <button id="btn-hide-hud" class="ghost" data-i18n="set.hud.hideall">Tout masquer</button>
+        <button id="btn-reset-hud" class="ghost" data-i18n="set.hud.reset">Tout réafficher</button>
+      </div>
+    </details>
+
+    <details>
+      <summary data-i18n="set.sync">Collecte</summary>
+
+      <label class="row">
+        <span data-i18n="set.alarm">Réveil automatique</span>
+        <select id="set-alarm-minutes">
+          <option value="2" data-i18n="set.alarm.2">2 min</option>
+          <option value="3" data-i18n="set.alarm.3">3 min</option>
+          <option value="5" data-i18n="set.alarm.5">5 min</option>
+          <option value="10" data-i18n="set.alarm.10">10 min</option>
+        </select>
+      </label>
+      <p class="hint" data-i18n="set.alarm.hint">
+        Une chaîne n’est relue que quand son tour vient. Se réveiller plus
+        souvent rapproche la collecte de ce moment, sans relire plus de chaînes.
+      </p>
+
+      <!-- A period, not a budget. The requests per day slider that used to hold
+           this place asked one to arbitrate a spend that measurement showed was
+           not binding, and made it impossible to predict when a given channel
+           would be read again. -->
+      <label class="row">
+        <span data-i18n="set.sweep">Relire chaque chaîne</span>
+        <select id="set-sweep-minutes">
+          <option value="10" data-i18n="set.sweep.10">10 min</option>
+          <option value="15" data-i18n="set.sweep.15">15 min</option>
+          <option value="20" data-i18n="set.sweep.20">20 min</option>
+          <option value="30" data-i18n="set.sweep.30">30 min</option>
+          <option value="60" data-i18n="set.sweep.60">1 h</option>
+        </select>
+      </label>
+      <p class="hint" data-i18n="set.sweep.hint">Cadence de relecture des flux récents. Les pannes et caches peuvent retarder une collecte.</p>
+
+      <label class="row">
+        <span data-i18n="set.dormant">Ralentir les chaînes en veille</span>
+        <input id="set-slow-dormant" type="checkbox">
+      </label>
+      <p class="hint" data-i18n="set.dormant.hint">
+        Sans une seule vidéo depuis un an, relues toutes les 2 h. Leur retour
+        est vu dans la demi journée.
+      </p>
+
+      <label class="row">
+        <span data-i18n="set.synclives">Suivre aussi les lives</span>
+        <input id="set-sync-lives" type="checkbox">
+      </label>
+      <p class="hint" data-i18n="set.synclives.hint">Collecte aussi les directs et rediffusions. Rafraîchir consulte l’onglet En direct de chaque chaîne.</p>
+
+      <p id="cadence-line" class="hint"></p>
+
+      <button id="btn-sync" data-i18n="set.resync">Tout resynchroniser</button>
+      <p class="hint" data-i18n="set.resync.hint">Parcourt Vidéos et En direct sur les sept derniers jours.</p>
+    </details>
+
+    <details>
+      <summary data-i18n="set.subs">Abonnements</summary>
+      <button id="btn-reimport" data-i18n="set.subs.reimport">Réimporter depuis YouTube</button>
+      <label for="csv-input" class="filebtn" data-i18n="set.subs.takeout">Importer un fichier Takeout</label>
+      <input id="csv-input" type="file" accept=".csv,text/csv" hidden>
+      <p class="hint" data-i18n="set.subs.hint">
+        Tes abonnements et désabonnements pris sur YouTube sont détectés au
+        vol : il n’y a rien à réimporter. Ces boutons servent quand tu t’es
+        abonné depuis un autre appareil, ou après une longue absence.
+      </p>
+
+      <label for="batch-input" class="filebtn" data-i18n="set.subs.lot">Appliquer une liste à mon compte</label>
+      <input id="batch-input" type="file" accept=".csv,text/csv,.txt,text/plain" hidden>
+      <p class="hint" data-i18n="set.subs.lot.hint">Celui là s’abonne et se désabonne pour de vrai, après validation.</p>
+    </details>
+
+    <details>
+      <summary data-i18n="set.backup">Sauvegarde</summary>
+      <button id="btn-export" data-i18n="set.backup.export">Exporter mes données</button>
+      <label for="restore-input" class="filebtn" data-i18n="set.backup.restore">Restaurer une sauvegarde</label>
+      <input id="restore-input" type="file" accept=".json,application/json" hidden>
+      <!-- Restoring a backup onto a machine one has just configured differently
+           must not silently undo that configuration. The choice is made before
+           picking the file, because afterwards it is too late. -->
+      <label class="row">
+        <span data-i18n="set.backup.withsettings">Restaurer aussi les réglages</span>
+        <input id="restore-settings" type="checkbox" checked>
+      </label>
+      <!-- The single report at the foot of the panel put the outcome of a
+           restore three blocks below the button that started it, under the
+           diagnostic section, where it read as the diagnostic's answer. An
+           action reports itself where it was asked for. -->
+      <div id="restore-progress" class="progress" hidden>
+        <div class="bar"><i></i></div>
+        <span class="label"></span>
+      </div>
+      <pre id="backup-report" class="report" hidden></pre>
+      <!-- The old wording, "hidings, priorities and progress only live in this
+           browser", was read as "they are not in the backup" — the opposite of
+           what it meant. They are in it; that is the whole reason the backup
+           exists. And it now says "the whole database", because a file that
+           silently left the imported history out was read as complete, and a
+           restore then gave back a profile with no history at all. -->
+      <p class="hint" data-i18n="set.backup.hint">Sauvegarde tes choix, réglages et données d’historique. Les vidéos ordinaires sont recollectées après restauration.</p>
+    </details>
+
+    <details>
+      <summary data-i18n="set.audit">Diagnostic</summary>
+      <label class="row">
+        <span data-i18n="set.audit.window">Fenêtre analysée</span>
+        <select id="audit-window">
+          <option value="1" data-i18n="set.audit.d1">1 jour</option>
+          <option value="2" selected data-i18n="set.audit.d2">2 jours</option>
+          <option value="7" data-i18n="set.audit.d7">7 jours</option>
+          <option value="30" data-i18n="set.audit.d30">30 jours</option>
+        </select>
+      </label>
+      <p class="hint" data-i18n="set.audit.hint">
+        Compare ce que l’extension connaît à ce que YouTube affiche sur la même
+        période, et liste les vidéos que son feed a omises.
+      </p>
+      <button id="btn-audit" data-i18n="set.audit.btn">Comparer TrackTube à YouTube</button>
+      <p class="hint" data-i18n="set.audit.reverse.hint">
+        Vérifie directement la source du feed YouTube depuis un onglet connecté.
+      </p>
+      <button id="btn-audit-reverse" data-i18n="set.audit.reverse.btn">Vérifier les vidéos YouTube dans TrackTube</button>
+      <pre id="footer" class="report muted"></pre>
+    </details>
+
+    <pre id="report" class="report" hidden></pre>
+  </div>
+
+  <!-- ------------------------------------------------------------- help --- -->
+  <!-- The long explanations live here, and nowhere else. Under each setting,
+       they turned the panel into a manual: three lines of prose for a checkbox
+       one understands by reading it.
+
+       Every entry shows, whichever tab is open. Filtering them by mode left a
+       single entry under History and under Triage, the very one that is already
+       general, and hid the feed's six entries from whoever was there. -->
+  <div id="docs" class="sheet" hidden>
+    <header class="sheet-head">
+      <h2 id="docs-title" data-i18n="pop.help">Aide</h2>
+      <span class="version"></span>
+      <button id="btn-docs-close" class="icon" data-i18n-label="pop.close" aria-label="Fermer">✕</button>
+    </header>
+
+    <!-- The button first: whoever reopens the help is often after the full
+         presentation, not one entry in particular. -->
+    <button id="btn-onboarding" data-i18n="pop.onboarding">Prise en main</button>
+
+    <details open>
+      <summary data-i18n="docs.what.h">À quoi sert cette extension</summary>
+      <p data-i18n="docs.what.p1">
+        La page Abonnements de YouTube n’est plus une liste chronologique : elle
+        s’ouvre sur un bloc « Les plus pertinentes » et un bloc de directs, et
+        des carrousels de Shorts reviennent au milieu de la liste. La suite
+        chronologique n’y est plus l’essentiel.
+      </p>
+      <p data-i18n="docs.what.p2">
+        L’extension reconstruit ce fil à partir des flux publics de chaque
+        chaîne, un par un, et l’affiche à la place de celui de YouTube. Rien
+        n’est filtré sans que tu l’aies demandé, les Shorts sont exclus à la
+        source, et les quelques vidéos qui n’étaient pas remontées jusqu’à
+        ta page Abonnements y sont aussi.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.refresh.h">Pourquoi actualiser la page ne collecte rien</summary>
+      <p data-i18n="docs.refresh.p1">
+        La collecte tourne en arrière plan, à son propre rythme, indépendamment
+        de tes onglets. Recharger le feed réaffiche ce qui est déjà connu.
+      </p>
+      <p data-i18n="docs.refresh.p2">
+        Le bouton ⟳ en haut à droite du feed force un passage immédiat. L’anneau
+        autour de lui indique l’ancienneté de la dernière collecte.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.watched.h">Vue, en cours, à voir</summary>
+      <p data-i18n="docs.watched.p1">
+        Une vidéo compte comme vue au delà de la part de durée réglée, mesurée
+        en temps réellement écoulé, vitesse de lecture prise en compte. Faire
+        glisser le curseur jusqu’à la fin ne suffit pas.
+      </p>
+      <p data-i18n="docs.watched.p2">
+        En dessous de ce seuil, et au delà de quelques secondes, elle est « en
+        cours » : commencée, pas finie. Elle a sa propre vue dans le feed.
+      </p>
+      <p data-i18n="docs.watched.p3">
+        Le suivi démarre à l’installation. Ce que tu as regardé avant se
+        récupère par un export Takeout, dans l’onglet Historique.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.lives.h">Directs, rediffusions, programmées</summary>
+      <p data-i18n="docs.lives.p1">
+        Trois choses différentes, réglables séparément. Un direct est en cours :
+        c’est le seul contenu qui perd tout intérêt si on le rate.
+      </p>
+      <p data-i18n="docs.lives.p2">
+        Une rediffusion est un direct terminé, devenu une vidéo comme une autre.
+        Elle porte la mention REDIFF suivie de sa durée. Un streamer quotidien
+        en produit à lui seul autant que plusieurs chaînes réunies.
+      </p>
+      <p data-i18n="docs.lives.p3">
+        Une programmée est annoncée mais n’a encore rien à montrer, parfois
+        pendant des jours. Elle porte la mention PRÉVU suivie de l’heure.
+        Retirée du fil, elle y revient une fois diffusée.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.hide.h">Masquer et prioriser</summary>
+      <p data-i18n="docs.hide.p1">
+        Le ✕ d’une vignette masque la vidéo : elle quitte le feed et n’y revient
+        pas. Contrairement au masquage de YouTube, il ne coûte rien au
+        chargement, puisqu’une vidéo masquée n’est jamais lue.
+      </p>
+      <p data-i18n="docs.hide.p2">
+        L’★ la marque prioritaire : elle échappe à tous les filtres et a sa
+        propre vue. Masquer écarte, prioriser distingue.
+      </p>
+      <p data-i18n="docs.hide.p3">
+        Le mode sélection applique l’un ou l’autre à un lot. Maj clic
+        sélectionne une plage, Échap sort.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.triage.h">Trier ses abonnements</summary>
+      <p data-i18n="docs.triage.p1">
+        L’onglet Tri passe tes abonnements un par un, comme une pile de
+        cartes : les dernières vidéos de la chaîne, son rythme, la part que
+        tu en regardes vraiment. À droite tu gardes, à gauche tu te
+        désabonnes.
+      </p>
+      <p data-i18n="docs.triage.p2">
+        Les chaînes qui ne publient plus, et celles dont tu masques tout,
+        viennent en premier. Un désabonnement ne part qu’une fois cinq cartes
+        plus loin : tu peux revenir dessus.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.histo.h">Analyser ce que tu regardes</summary>
+      <p data-i18n="docs.histo.p1">
+        L’onglet Historique ouvre une page à part : temps passé, chaînes les
+        plus regardées, chaînes que tu ne rates jamais, sujets qui reviennent
+        dans les titres, rétrospective en images.
+      </p>
+      <p data-i18n="docs.histo.p2">
+        Elle mesure ce que tu regardes depuis l’installation. Pour les années
+        d’avant, elle lit un export Google Takeout, expliqué pas à pas sur la
+        page.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.pace.h">Rythme de collecte</summary>
+      <p data-i18n="docs.pace.p1">
+        Toutes tes chaînes à chaque passage, sans exception ni classement. Aucune heuristique ne fait passer une chaîne populaire ou fréquente avant une autre.
+      </p>
+      <p data-i18n="docs.pace.p2">
+        « Relire chaque chaîne » fixe la période, de 10 minutes à une heure. Le départ est choisi à l’import selon le nombre de chaînes suivies : 10 minutes en dessous de 500, 15 jusqu’à 1000, 30 au delà. Le coût est proportionnel à la liste, pas la fraîcheur.
+      </p>
+      <p data-i18n="docs.pace.p2b">
+        « Réveil automatique » n’est pas une cadence mais une granularité : à chaque réveil, seules les chaînes dont l’heure est venue sont relues. Se réveiller plus souvent ne relit pas plus de chaînes, seulement plus tôt.
+      </p>
+      <p data-i18n="docs.pace.p3">
+        Les chaînes sans une seule vidéo depuis un an passent à deux heures, si le réglage est actif. Leur retour reste vu dans la demi journée.
+      </p>
+      <p data-i18n="docs.pace.p4">
+        Le coût est de la bande passante, pas de la lenteur : environ 10 Ko par chaîne et par lecture, dans le service worker, sans effet sur ta navigation.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.data.h">Où vont mes données</summary>
+      <p data-i18n="docs.data.p1">
+        Nulle part. Tout est stocké dans ce navigateur : la liste des chaînes,
+        les vidéos connues, les masquages, les priorités, ce que tu as regardé.
+        Aucun serveur, aucun compte, aucune télémétrie.
+      </p>
+      <p data-i18n="docs.data.p2">
+        L’extension parle à youtube.com, et à rien d’autre. L’aperçu au survol
+        demande la vidéo comme le fait le lecteur de YouTube, mais sans cookie :
+        ça ne compte pas comme un visionnage et ça ne nourrit aucune
+        recommandation. La sauvegarde exporte un fichier que tu gardes toi même.
+      </p>
+    </details>
+
+    <details>
+      <summary data-i18n="docs.compte.h">Un seul compte YouTube</summary>
+      <p data-i18n="docs.compte.p1">
+        L’extension se rattache au compte connecté la première fois qu’elle voit
+        YouTube. Ses abonnements, ses vidéos et ses visionnages appartiennent à
+        ce compte là.
+      </p>
+      <p data-i18n="docs.compte.p2">Une identité différente détectée met les écritures en pause. Si YouTube ne fournit pas son identité, cette protection est limitée : utilise un profil de navigateur distinct pour un autre compte.</p>
+    </details>
+    <p><a href="../../privacy.html" target="_blank" rel="noopener" data-i18n="docs.privacy">Confidentialité</a>
+    <br><a class="repo-link" href="#" target="_blank" rel="noopener" data-i18n="docs.repo" hidden>Signaler un problème ou proposer une idée</a></p>
+  </div>
+
+  <!-- The modes at the bottom, tab bar fashion: the extension does several
+       distinct things, and stacking them on one screen drowned them. -->
+  <nav class="tabs">
+    <button class="tab is-active" data-mode="feed" data-i18n="pop.tab.feed">Feed</button>
+    <button class="tab" data-mode="history" data-i18n="pop.tab.history">Historique</button>
+    <button class="tab" data-mode="triage" data-i18n="pop.tab.triage">Tri</button>
+  </nav>
+
+  <script src="popup-guard.js"></script>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

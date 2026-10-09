@@ -1,0 +1,24 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube : couverture de collecte</title>
+<p id="summary">Exécution…</p>
+<ul id="results"></ul>
+<script type="module">
+  import {run} from './coverage.js';
+  try {
+    const results = await run();
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.className = r.pass ? 'pass' : 'fail';
+      li.textContent = r.name + (r.extra ? ' : ' + JSON.stringify(r.extra) : '');
+      document.querySelector('#results').append(li);
+    }
+    const failed = results.filter(r=>!r.pass).length;
+    document.querySelector('#summary').textContent = `${results.length} tests de collecte, ${failed} échecs`;
+    document.querySelector('#summary').className = failed ? 'red' : 'green';
+  } catch (err) {
+    const li = document.createElement('li');li.className='fail';li.textContent=err.stack;
+    document.querySelector('#results').append(li);
+    document.querySelector('#summary').className='red';
+  }
+</script>

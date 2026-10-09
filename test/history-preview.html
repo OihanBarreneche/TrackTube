@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — aperçu de l'analyse d'historique</title>
+  <link rel="stylesheet" href="../src/pages/history.css">
+  <style>
+    .banc {
+      max-width: 900px; margin: 0 auto 18px; padding: 10px 14px;
+      border: 1px dashed #4a4a2a; border-radius: 10px;
+      color: #d8cf9a; font: 12.5px/1.6 Roboto, system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <p class="banc" id="banc">Banc d'essai — chargement…</p>
+  <div id="hote"></div>
+
+  <script type="module">
+    /**
+     * Preview of the analysis page without the extension.
+     *
+     * Same intention as `feed-view-preview.html` and `triage-preview.html`:
+     * seeing the layout at realistic volumes without having to reload the
+     * extension in Chrome. The difference here is that the computation is not
+     * simulated — the bench runs the real `parseWatchHistory` and then the real
+     * `computeStats` on a Takeout export, and stubs the messaging only.
+     *
+     * Lay `test/.tmp-wh.json` next to this file to use a real export; without
+     * it, the bench falls back on a synthetic set.
+     */
+    import {
+      parseWatchHistory, computeStats, computeChannelStreaks, extractThemes,
+      classifyTopics, detectAutoOpened, previousRange,
+      computeChannelReport, listHistoryChannels, findVideosByTerm, refineChannelMeans,
+      computeWatchDelays, computeSessions, computeRewatches, computeDropoff, computeUploadRhythm,
+    } from '../src/lib/history.js';
+
+    const banc = document.getElementById('banc');
+
+    let entries = [];
+    try {
+      const res = await fetch('.tmp-wh.json');
+      if (!res.ok) throw new Error(String(res.status));
+      const t0 = performance.now();
+      const brut = await res.json();
+      const lu = parseWatchHistory(brut);
+      entries = lu.entries;
+      banc.textContent = `Export réel : ${entries.length} visionnages analysés en `
+        + `${Math.round(performance.now() - t0)} ms.`;
+    } catch {
+      // The set ends today and not on a written down date. It used to start on
+      // 1 January 2026, and by September the newest viewing was six months old:
+      // every window counted from now — the ranges of the bar, the thirty and
+      // ninety days of the publishing rhythm — was empty, and the page showed
+      // "0,0 vidéo par semaine" where a real account shows its flow. A fixed
+      // date in a fixture becomes wrong on its own, without anyone touching it.
+      // Deterministic, and deliberately uneven.
+      //
+      // The first version spaced the viewings evenly and handed each channel the
+      // same number of them. Every bar of every chart then came out the same
+      // height, every channel the same size: a layout bench that cannot show
+      // whether a ranking ranks, or whether an hourly curve has a shape. It also
+      // made the screenshots unusable, since a real account looks nothing like
+      // that. No `Math.random` though — a fixture that changes between two runs
+      // cannot be compared with the run before.
+      const rand = (() => {
+        let seed = 20261008;
+        return () => {
+          seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+          return seed / 0x7fffffff;
+        };
+      })();
+      const pick = (weights) => {
+        const total = weights.reduce((a, b) => a + b, 0);
+        let roll = rand() * total;
+        for (let i = 0; i < weights.length; i++) {
+          roll -= weights[i];
+          if (roll <= 0) return i;
+        }
+        return weights.length - 1;
+      };
+
+      const NAMES = ['Atelier Cosmos', 'Le Fil Rouge', 'Datafolie', 'Studio Pixel',
+        'Hors Cadre', 'Signal Faible', 'La Fabrique', 'Nuit Blanche', 'Contrepoint',
+        'Vertige', 'Boucle Ouverte', 'Plein Cadre', 'Marges', 'Le Banc', 'Oscillation',
+        'Terrain Vague', 'Chambre Noire', 'Point Fixe', 'Rémanence', 'Angle Mort',
+        'Basse Fréquence', 'Papier Calque', 'Cinquième Mur', 'Zone Tampon', 'Trait Plein',
+        'Faux Raccord', 'Sous Titre', 'Grain Fin', 'Carnet de Bord', 'Trame',
+        'Lignes de Fuite', 'Hors Piste', 'Second Plan', 'Fond de Carte', 'Clair Obscur',
+        'Décalage', 'Ligne Claire', 'Pleine Page', 'Bruit de Fond', 'Travelling'];
+      const SUBJECTS = ['Rocket League', 'machine learning', 'Geoguessr', 'rétro gaming',
+        'photographie', 'astronomie', 'cuisine', 'montage vidéo', 'guitare', 'urbanisme',
+        'histoire', 'économie', 'climat', 'typographie', 'randonnée'];
+      const SHAPES = ['Pourquoi {s} change tout', '{s} : ce que personne ne dit',
+        'J\'ai testé {s} pendant un an', 'Le guide complet de {s}',
+        '{s}, expliqué simplement', 'Trois erreurs classiques en {s}',
+        'Une heure sur {s}', '{s} : le point sur 2026'];
+
+      // A few channels carry most of the viewing, as they do on a real account.
+      const weight = NAMES.map((_, i) => 1 / (i + 1.6));
+      // Evenings, and the weekend. The two charts the page draws from the clock
+      // are the ones a flat fixture made meaningless.
+      const HOURS = [1, 1, 0, 0, 0, 0, 1, 3, 5, 4, 3, 4, 6, 5, 4, 5, 7, 9, 12, 16, 20, 22, 17, 8];
+      const WEEKDAYS = [12, 7, 6, 6, 7, 9, 14];
+
+      const DAYS = 365;
+      const start = Date.now() - DAYS * 864e5;
+      for (let i = 0; i < 900; i++) {
+        const channel = pick(weight);
+        const subject = SUBJECTS[(channel * 3 + pick([3, 2, 1])) % SUBJECTS.length];
+        // A day drawn from the weekday profile, then an hour from the daily one.
+        let day = Math.floor(rand() * DAYS);
+        for (let tries = 0; tries < 4; tries++) {
+          const weekday = new Date(start + day * 864e5).getDay();
+          if (rand() * 14 <= WEEKDAYS[weekday]) break;
+          day = Math.floor(rand() * DAYS);
+        }
+        const at = new Date(start + day * 864e5);
+        at.setHours(pick(HOURS), Math.floor(rand() * 60), Math.floor(rand() * 60), 0);
+        entries.push({
+          videoId: `v${String(i).padStart(10, '0')}`,
+          watchedAt: at.getTime(),
+          title: SHAPES[i % SHAPES.length].replace('{s}', subject),
+          channelId: `UC${String(channel).padStart(22, 'x')}`,
+          channelTitle: NAMES[channel],
+          nonResolue: false,
+        });
+      }
+      // Chronological, like a real export: several passes downstream assume it.
+      entries.sort((a, b) => a.watchedAt - b.watchedAt);
+      banc.textContent = `Aucun .tmp-wh.json : jeu synthétique de ${entries.length} visionnages.`;
+    }
+
+    // Plausible durations and uploads, so that the sections concerned are not
+    // empty: the bench tests the layout, not the accuracy of the figures.
+    //
+    // Part of the viewings carries a genuinely measured time, as a history would
+    // where the extension had been installed part way through. That is the only
+    // state where the page has both measurements to set against each other, and
+    // hence the only one where the text telling them apart really shows.
+    const durations = new Map();
+    const uploads = new Map();
+    for (const [i, e] of entries.entries()) {
+      if (i % 3 === 0) durations.set(e.videoId, 300 + (i % 40) * 90);
+      // The measured time is drawn from the video's duration, and not from an
+      // independent sequence: otherwise the share watched would saturate at a
+      // hundred per cent everywhere and the column would show a page that cannot
+      // exist.
+      if (i % 4 === 0) {
+        // The duration has to be known for the ratio to mean anything:
+        // measuring the time spent on a video whose length is unknown says
+        // nothing.
+        if (!durations.has(e.videoId)) durations.set(e.videoId, 300 + (i % 40) * 90);
+        e.watchedSec = Math.round(durations.get(e.videoId) * (0.2 + (i % 7) * 0.11));
+      }
+      if (e.channelId) {
+        if (!uploads.has(e.channelId)) uploads.set(e.channelId, []);
+        const l = uploads.get(e.channelId);
+        if (l.length < 100 && !l.includes(e.videoId)) l.push(e.videoId);
+      }
+    }
+    // A handful of videos opened again later: without them the rewatch table
+    // stays empty on the bench, and a real history always holds some.
+    for (let i = 40; i < entries.length; i += 37) {
+      const source = entries[i - 30];
+      if (!source) continue;
+      entries[i] = { ...source, watchedAt: entries[i].watchedAt, key: `${source.videoId}|${entries[i].watchedAt}` };
+    }
+
+    // Publication dates for part of the videos, and the upload list they are read
+    // from. Deliberately partial, because that is the real state: the feed index
+    // starts at the installation and holds nothing of what was watched before —
+    // which is precisely what the scope sentences under those blocks say.
+    //
+    // The delay is drawn from the viewing and not the other way round, so that
+    // the four buckets of the distribution are all fed: a video opened the same
+    // day, one within the week, one within the month, one long after.
+    const DELAIS = [3 * 3600e3, 3 * 86400e3, 12 * 86400e3, 200 * 86400e3];
+    const published = new Map();
+    const uploadRows = [];
+    for (const [i, e] of entries.entries()) {
+      if (i % 3 === 1) continue;   // one video in three stays undated
+      const at = e.watchedAt - DELAIS[i % DELAIS.length];
+      published.set(e.videoId, at);
+      if (e.channelId) uploadRows.push({ channelId: e.channelId, publishedAt: at });
+    }
+
+    // One channel in three has a last video never watched: without this every
+    // streak would be perfect, and the report would never show the gap between
+    // the streak under way and the best streak.
+    for (const [i, id] of [...uploads.keys()].entries()) {
+      if (i % 3 === 0) uploads.get(id).unshift(`jamais${String(i).padStart(5, '0')}`);
+    }
+
+    // Deliberately partial: that is the normal state while the enrichment runs,
+    // and it is the only case where the progress bar shows.
+    const moyennesUploads = new Map([...uploads.keys()]
+      .filter((_, i) => i % 4 !== 0)
+      .map((id, i) => [id, 600 + (i % 30) * 60]));
+
+    // The same refining the service worker does: without it, the bench would
+    // estimate the durations differently from the real page, and the differences
+    // seen here would say nothing about what the user sees.
+    const channelMeans = refineChannelMeans(entries, durations, moyennesUploads);
+
+    // Fake subscriptions: one channel in three among those watched, plus a few
+    // channels never watched, so that the cross check has both columns to fill
+    // rather than an empty section.
+    const vues = [...uploads.keys()];
+    const abonnes = vues.filter((_, i) => i % 3 === 0);
+    const actifs = [
+      ...abonnes.map((id) => ({
+        id, title: entries.find((e) => e.channelId === id)?.channelTitle ?? id,
+      })),
+      ...Array.from({ length: 8 }, (_, i) => ({
+        id: `UCfantome${String(i).padStart(14, '0')}`, title: `Abonnement oublié ${i + 1}`,
+      })),
+    ];
+    const subscribed = new Set(actifs.map((c) => c.id));
+
+    const params = new URL(location.href).searchParams;
+    window.historyBench = {responses:[]};
+    // `?lang=en` renders the bench against the English catalogue. The two sides
+    // are kept at strict parity by a test, but parity is not layout: an English
+    // string is routinely a third longer, and the README and the store listing
+    // are written from this side. Without a parameter the only way to see it was
+    // to change the setting inside the installed extension.
+    const benchLang = new URL(location.href).searchParams.get('lang');
+
+    const storageKey = 'tracktube:historyBench';
+    const stub = {
+      runtime: {
+        id: 'bench',
+        sendMessage: async (msg) => {
+          // `send()` spreads the payload into the message, there is no
+          // `payload` field: reading beside it would make every range fall back
+          // on "all" with nothing signalling it.
+          if (['history:summary','history:stats'].includes(msg.type))
+            await new Promise(r => setTimeout(r, Number(params.get('slowWorker')) || 0));
+          if (params.has('rangeRace') && msg.type === 'history:stats' && JSON.parse(msg.cacheScope || '[]')[0] === '30j')
+            await new Promise(r => setTimeout(r, 900));
+          const { from = 0, to = Date.now() } = msg;
+          const commun = { topN: 15, durations, channelMeans, subscribed };
+
+          if (msg.type === 'history:summary') {
+            const answer = { ok: true, summary: {
+              count: entries.length,
+              from: Math.min(...entries.map((e) => e.watchedAt)),
+              to: Math.max(...entries.map((e) => e.watchedAt)),
+            } };
+            await stub.storage.local.set({'ytfeed:histSummary':answer});
+            return answer;
+          }
+          if (msg.type === 'history:stats') {
+            const t0 = performance.now();
+            const stats = computeStats(entries, { from, to, ...commun });
+            const avant = computeStats(entries, { ...previousRange({ from, to }), ...commun });
+            const dansPlage = entries.filter((e) => e.watchedAt >= from && e.watchedAt <= to);
+            const vuesPlage = new Set(dansPlage.map((e) => e.channelId));
+
+            // The worker attaches the streak to its channel in the ranking:
+            // without this the bench would never show the table's 🔥 badge.
+            const streaks = computeChannelStreaks(entries, uploads).map((x) => ({
+              ...x, title: entries.find((e) => e.channelId === x.channelId)?.channelTitle,
+            }));
+            const parId = new Map(streaks.map((x) => [x.channelId, x]));
+            for (const c of stats.topChannels) {
+              const s = parId.get(c.channelId);
+              if (s) { c.streak = s.streak; c.streakCapped = s.capped; }
+            }
+            const out = {
+              ok: true,
+              stats,
+              previous: avant,
+              streaks,
+              themes: extractThemes(dansPlage),
+              topics: classifyTopics(dansPlage),
+              subscriptions: {
+                total: actifs.length,
+                neverWatched: actifs.filter((c) => !vuesPlage.has(c.id)).length,
+                examples: actifs.filter((c) => !vuesPlage.has(c.id)).slice(0, 12)
+                  .map((c) => ({ channelId: c.id, title: c.title, lastSeen: null })),
+                candidates: stats.unsubscribedCandidates,
+              },
+              enriched: uploads.size,
+              delays: computeWatchDelays(dansPlage, published, { from, to }),
+              sessions: computeSessions(dansPlage, { from, to }),
+              rewatches: computeRewatches(dansPlage, { from, to }),
+              dropoff: computeDropoff(dansPlage, durations, { from, to }),
+              publishing: computeUploadRhythm(uploadRows),
+            };
+            banc.dataset.calcul = `${Math.round(performance.now() - t0)} ms`;
+            window.historyBench.responses.push({scope:msg.cacheScope,total:stats.total});
+            if (msg.cacheScope) {
+              out.cacheScope = msg.cacheScope;
+              await stub.storage.local.set({'ytfeed:uiHistoryStats':out});
+            }
+            return out;
+          }
+          if (msg.type === 'history:channels') {
+            return { ok: true, channels: listHistoryChannels(entries, { durations, channelMeans }) };
+          }
+          if (msg.type === 'history:channel') {
+            const fiche = computeChannelReport(entries, {
+              channelId: msg.channelId, from, to, durations, channelMeans,
+              uploads: uploads.get(msg.channelId) ?? [],
+            });
+            if (!fiche) return { ok: true, report: null };
+            const ensemble = computeStats(entries, { from, to, topN: 0, durations, channelMeans });
+            return { ok: true, report: {
+              ...fiche,
+              subscribed: subscribed.has(msg.channelId),
+              hidden: false,
+              rank: null,
+              rangeChannels: ensemble.distinctChannels,
+              timeShare: ensemble.totalSeconds ? fiche.seconds / ensemble.totalSeconds : 0,
+              viewShare: ensemble.total ? fiche.opens / ensemble.total : 0,
+              delays: computeWatchDelays(
+                entries.filter((e) => e.channelId === msg.channelId), published, { from, to }),
+              dropoff: computeDropoff(
+                entries.filter((e) => e.channelId === msg.channelId), durations, { from, to }),
+              publishing: computeUploadRhythm(uploadRows, { channelId: msg.channelId }),
+            } };
+          }
+          if (msg.type === 'history:videos') {
+            return { ok: true, videos: findVideosByTerm(entries, {
+              term: msg.term, topic: msg.topic, channelId: msg.channelId,
+              from, to, durations, channelMeans,
+            }) };
+          }
+          if (msg.type === 'history:suspects') {
+            return { ok: true, suspects: detectAutoOpened(entries, { minViews: msg.minViews }) };
+          }
+          if (msg.type === 'history:enrich:state') {
+            return { ok: true, running: false, stalled: false, remaining: 0,
+                     enriched: uploads.size, failures: 0 };
+          }
+          // The bench has no YouTube tab to drive; answering "started" avoids
+          // showing an error message that has nothing to do with what one has
+          // come to look at here.
+          if (msg.type === 'history:enrich:start') return { ok: true, started: true };
+          return { ok: true };
+        },
+      },
+      storage: {
+        local: {
+          _d: { histoSuspectsVus: true, histoBlacklist: ['Ma propre chaîne'], histoExcludedVideos: [],
+            ...JSON.parse(localStorage.getItem(storageKey) || '{}'),
+            ...(benchLang ? { 'ytfeed:lang': benchLang } : {}) },
+          async get(k) {
+            const cles = Array.isArray(k) ? k : [k];
+            return Object.fromEntries(cles.map((c) => [c, this._d[c]]).filter(([, v]) => v !== undefined));
+          },
+          async set(o) { Object.assign(this._d, o); localStorage.setItem(storageKey, JSON.stringify(this._d)); },
+        },
+        // The page subscribes to the language change at the very last moment:
+        // without this hook, the bench ended on an exception that had nothing to
+        // do with what one has come to look at.
+        onChanged: { addListener() {} },
+      },
+    };
+    globalThis.chrome = stub;
+
+    // The page wires itself onto ids of the document: it is installed there
+    // before importing its script.
+    const html = await (await fetch('../history.html')).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    document.getElementById('hote').append(...doc.body.children);
+
+    await import('../src/pages/history.js');
+
+    const t = setInterval(() => {
+      if (!banc.dataset.calcul) return;
+      clearInterval(t);
+      banc.textContent += ` Statistiques recalculées en ${banc.dataset.calcul}.`;
+    }, 200);
+
+    // `?shot=overview` frames the picture `tools/shoot.py` takes: from the eight
+    // headline figures down to the two rhythm charts, which is the stretch that
+    // says what the page is for.
+    //
+    // The frame is a stylesheet and not one pass of `hidden`, because several
+    // cards below start hidden and the page reveals them on its own once their
+    // data lands — `#card-delays` among them. A card revealed after the frame
+    // was set still carries no mark, so the rule still hides it.
+    if (new URL(location.href).searchParams.get('shot') === 'overview') {
+      const ready = setInterval(() => {
+        const figures = document.getElementById('figures');
+        const rhythm = document.getElementById('rhythm-grid');
+        if (!figures?.children.length || !rhythm?.children.length) return;
+        clearInterval(ready);
+        banc.remove();
+
+        // The cards are children of `#view-global`, not of `#results`: the
+        // range bar, the search and the three game cards are what sits directly
+        // under `#results`, and marking at that level kept the whole view.
+        const view = document.getElementById('view-global');
+        const last = rhythm.closest('section');
+        let seen = false;
+        for (const node of view.children) {
+          if (node === figures) seen = true;
+          if (seen) node.dataset.shotKeep = '';
+          if (node === last) break;
+        }
+        document.head.append(Object.assign(document.createElement('style'), {
+          textContent: '#results > :not(#view-global) { display: none !important }'
+            + '#view-global > :not([data-shot-keep]) { display: none !important }'
+            + '#results { margin: 0 }',
+        }));
+
+        // The card ends at its charts: the sittings and the summary line below
+        // them belong to the next picture, not this one.
+        document.getElementById('rhythm-summary')?.remove();
+        document.getElementById('sessions')?.remove();
+        document.documentElement.dataset.shot = 'ready';
+      }, 150);
+    }
+  </script>
+</body>
+</html>

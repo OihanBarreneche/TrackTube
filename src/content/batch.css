@@ -1,0 +1,165 @@
+/**
+ * Applying a list of channels — full screen over YouTube.
+ *
+ * Same conventions as the triage: modal view, self contained dark colours,
+ * nothing depending on the theme of the page covered. The panel is markedly
+ * wider than the triage's because it carries two columns of names, and those
+ * names are exactly what one needs to be able to read before pressing.
+ */
+
+html.tracktube-batch-open { overflow: hidden; }
+html.tracktube-batch-open ytd-app { visibility: hidden; }
+html.tracktube-batch-open #tracktube-batch { visibility: visible; }
+
+#tracktube-batch {
+  /* Same palette as everywhere else: solid action for what triggers, accent as
+     a rule for states and measurements. The tokens are redeclared here because
+     this view covers YouTube and descends from no root of ours — there is no
+     common stylesheet in a project without a bundler. */
+  --ytf-action: #5b4bf5;
+  --ytf-accent: #9d8bff;
+
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .92);
+  color: #e9e9f5;
+  font-family: Roboto, Arial, sans-serif;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#tracktube-batch h2 { margin: 0 0 6px; font-size: 22px; font-weight: 600; }
+#tracktube-batch h3 { margin: 0; font-size: 15px; font-weight: 600; }
+#tracktube-batch p { margin: 0; }
+
+#tracktube-batch button {
+  padding: 9px 16px;
+  border: 1px solid #25253c;
+  border-radius: 999px;
+  background: #21212d;
+  color: #e9e9f5;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+#tracktube-batch button:hover:not(:disabled) { background: #343442; }
+#tracktube-batch button:disabled { opacity: .4; cursor: default; }
+
+.tracktube-batch-panel {
+  width: min(880px, 100%);
+  padding: 26px;
+  border-radius: 16px;
+  background: #11111c;
+  border: 1px solid #25253c;
+}
+
+.tracktube-batch-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.tracktube-batch-lead { color: #9a9ab0; font-size: 14px; line-height: 1.5; }
+.tracktube-batch-primary { background: var(--ytf-action) !important; border-color: var(--ytf-action) !important; color: #fff !important; }
+.tracktube-batch-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--ytf-action) 82%, #fff) !important; }
+.tracktube-batch-ghost { background: transparent !important; }
+
+.tracktube-batch-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 10px; }
+.tracktube-batch-chip { padding: 7px 12px !important; font-size: 13px !important; }
+.tracktube-batch-chip[aria-pressed="true"] { background: #e9e9f5 !important; color: #07070e !important; }
+
+.tracktube-batch-explainer { color: #9a9ab0; font-size: 13px; line-height: 1.5; }
+
+/* -------------------------------------------------------------- counters -- */
+
+.tracktube-batch-summary { display: flex; gap: 10px; margin: 16px 0; }
+
+.tracktube-batch-figure {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #25253c;
+  border-radius: 10px;
+  background: #1a1a24;
+}
+
+.tracktube-batch-figure b { display: block; font-size: 24px; font-weight: 600; }
+.tracktube-batch-figure span { color: #9a9ab0; font-size: 12px; }
+.tracktube-batch-figure.join b { color: #5ec48d; }
+.tracktube-batch-figure.leave b { color: #ff6b7d; }
+
+/* ----------------------------------------------------------------- alerts -- */
+
+.tracktube-batch-notice { margin-top: 10px; color: #82829c; font-size: 12.5px; line-height: 1.5; }
+
+.tracktube-batch-warning,
+.tracktube-batch-blocking {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tracktube-batch-warning { border-left: 3px solid var(--ytf-action); background: color-mix(in srgb, var(--ytf-action) 12%, transparent); color: #cfc7ff; }
+.tracktube-batch-blocking { border-left: 3px solid var(--ytf-accent); background: color-mix(in srgb, var(--ytf-accent) 12%, transparent); color: var(--ytf-accent); }
+.tracktube-batch-done { margin-top: 10px; color: #5ec48d; font-size: 13px; }
+
+/* ------------------------------------------------------------------ lists -- */
+
+.tracktube-batch-lists { display: flex; gap: 14px; margin: 14px 0; }
+.tracktube-batch-column { flex: 1; min-width: 0; border: 1px solid #25253c; border-radius: 10px; }
+
+.tracktube-batch-column-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #25253c;
+}
+
+.tracktube-batch-column-head h3.join { color: #5ec48d; }
+.tracktube-batch-column-head h3.leave { color: #ff6b7d; }
+.tracktube-batch-mini { padding: 4px 10px !important; font-size: 12px !important; }
+
+/* Bounded height, whole content: the entire plan is listed, the column
+   scrolls. Truncating the list would hide precisely what one is being asked to
+   check. */
+.tracktube-batch-list { max-height: 300px; overflow: auto; overscroll-behavior: contain; }
+
+.tracktube-batch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13.5px;
+}
+
+.tracktube-batch-row:nth-child(odd) { background: rgba(255, 255, 255, .03); }
+.tracktube-batch-row:hover { background: rgba(255, 255, 255, .07); }
+.tracktube-batch-row input { accent-color: var(--ytf-accent); width: 15px; height: 15px; flex: none; }
+
+.tracktube-batch-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* -------------------------------------------------------------- progress -- */
+
+.tracktube-batch-actions { margin-top: 18px; }
+
+.tracktube-batch-progress { margin-top: 16px; }
+
+.tracktube-batch-gauge {
+  height: 4px;
+  border-radius: 2px;
+  background: #25253c;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.tracktube-batch-gauge i { display: block; height: 100%; background: var(--ytf-accent); transition: width .2s; }
+
+@media (max-width: 720px) {
+  .tracktube-batch-lists { flex-direction: column; }
+}

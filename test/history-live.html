@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — relevé d'historique en direct</title>
+  <style>
+    body { font: 14px/1.6 system-ui; background: #0f0f0f; color: #f1f1f1; padding: 24px; }
+    li { margin: 3px 0; }
+    .ok::before { content: '✓ '; color: #4ade80; }
+    .ko::before { content: '✗ '; color: #f87171; }
+    .ko { color: #f87171; }
+    p { max-width: 780px; color: #bbb; }
+    code { color: #e6c07b; }
+  </style>
+</head>
+<body>
+  <h1>Relevé d'historique en direct</h1>
+  <p>
+    Ce banc exerce la <b>vraie</b> couche IndexedDB, pas une imitation. C'est le
+    seul moyen de vérifier deux choses qu'aucun test en mémoire n'attrape&nbsp;:
+    que la migration ajoute bien l'index <code>by_video</code> à une base
+    <em>déjà installée</em> — le cas de tous les profils existants, c'est-à-dire
+    précisément ceux qui ont de l'historique à perdre — et que réimporter un
+    export Takeout ne duplique pas les séances déjà mesurées.
+  </p>
+  <p>
+    La base porte le même nom que celle de l'extension, sans risque&nbsp;:
+    IndexedDB est cloisonné par origine, et cette page n'est pas l'extension.
+  </p>
+  <p id="score">…</p>
+  <ul id="results"></ul>
+
+  <script type="module">
+    const results = document.getElementById('results');
+    let pass = 0, fail = 0;
+
+    function check(label, ok, detail) {
+      const li = document.createElement('li');
+      li.className = ok ? 'ok' : 'ko';
+      li.textContent = ok ? label : `${label} — ${JSON.stringify(detail ?? null)}`;
+      results.append(li);
+      ok ? pass++ : fail++;
+    }
+
+    const promesse = (req) => new Promise((res, rej) => {
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+
+    // -- table rase ---------------------------------------------------------
+    await promesse(indexedDB.deleteDatabase('ytfeed'));
+
+    // -- an old style database, as an installed profile carries it -----------
+    // Version 3, with no per video index, with a Takeout entry already there.
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open('ytfeed', 3);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        const h = db.createObjectStore('history', { keyPath: 'key' });
+        h.createIndex('by_time', 'watchedAt');
+        h.createIndex('by_channel', 'channelId');
+        db.createObjectStore('channels', { keyPath: 'id' }).createIndex('by_due', 'nextDueAt');
+        const v = db.createObjectStore('videos', { keyPath: 'id' });
+        v.createIndex('by_published', 'publishedAt');
+        v.createIndex('by_channel', 'channelId');
+        v.createIndex('by_visible', ['hidden', 'publishedAt']);
+        db.createObjectStore('meta', { keyPath: 'key' });
+        db.createObjectStore('durations', { keyPath: 'videoId' });
+        db.createObjectStore('histoChannels', { keyPath: 'channelId' });
+      };
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('history', 'readwrite');
+        tx.objectStore('history').put({
+          key: 'vieille00000|1700000000000', videoId: 'vieille00000',
+          watchedAt: 1700000000000, title: 'Avant la migration',
+          channelId: 'UCzzzzzzzzzzzzzzzzzzzzzz', channelTitle: 'Chaîne Z', nonResolue: false,
+        });
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    // -- migration ----------------------------------------------------------
+    const db = await import('../src/lib/db.js');
+    check('migration : la version cible est bien la 7', db.DB_VERSION === 7, db.DB_VERSION);
+
+    const base = await db.openDb();
+    const noms = [...base.transaction('history').objectStore('history').indexNames];
+    check('migration : l’index par vidéo est ajouté à une base existante',
+      noms.includes('by_video'), noms);
+
+    const ancienne = await db.getAllHistory();
+    check('migration : l’historique déjà en base survit',
+      ancienne.length === 1 && ancienne[0].title === 'Avant la migration', ancienne);
+
+    // -- one session, written and then rewritten ----------------------------
+    const T0 = Date.parse('2026-08-16T20:00:00.000Z');
+    const seance = {
+      videoId: 'live0000001', watchedAt: T0, title: 'Une vidéo mesurée',
+      channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', channelTitle: 'Chaîne A',
+      nonResolue: false, durationSec: 1800, watchedSec: 30, completed: false,
+    };
+
+    const premier = await db.putWatchSession(seance);
+    check('séance : la première écriture crée l’entrée', premier.created === true, premier);
+
+    const second = await db.putWatchSession({ ...seance, watchedSec: 420 });
+    check('séance : la seconde écriture ne crée rien', second.created === false, second);
+
+    let tout = await db.getAllHistory();
+    check('séance : une seule ligne pour toute la séance',
+      tout.filter((e) => e.videoId === 'live0000001').length === 1,
+      tout.filter((e) => e.videoId === 'live0000001').length);
+    check('séance : le temps regardé est celui du dernier rapport',
+      tout.find((e) => e.videoId === 'live0000001').watchedSec === 420);
+
+    // A late report, sent before the others, must not make the measurement go
+    // backwards: that is the case of a background tab waking up.
+    await db.putWatchSession({ ...seance, watchedSec: 12 });
+    tout = await db.getAllHistory();
+    check('séance : un rapport en retard ne rabote pas le temps déjà mesuré',
+      tout.find((e) => e.videoId === 'live0000001').watchedSec === 420,
+      tout.find((e) => e.videoId === 'live0000001').watchedSec);
+
+    const durees = await db.getAllDurations();
+    check('séance : la durée exacte du lecteur part dans le store des durées',
+      durees.get('live0000001') === 1800, durees.get('live0000001'));
+
+    // Reopening the same video later is a distinct viewing.
+    await db.putWatchSession({ ...seance, watchedAt: T0 + 3 * 3600e3, watchedSec: 90 });
+    tout = await db.getAllHistory();
+    check('séance : rouvrir la vidéo plus tard crée une seconde séance',
+      tout.filter((e) => e.videoId === 'live0000001').length === 2,
+      tout.filter((e) => e.videoId === 'live0000001').length);
+
+    // -- Takeout import over measured sessions ------------------------------
+    // The rule is about the video, not about how close the timestamps are: as
+    // soon as the extension has measured a video, the export has nothing left to
+    // say about it.
+    const importe = await db.putHistory([
+      // The same viewing, as Google sees it: a few seconds apart.
+      { videoId: 'live0000001', watchedAt: T0 + 4000, title: 'Une vidéo mesurée',
+        channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', channelTitle: 'Chaîne A', nonResolue: false },
+      // A viewing of the same video hours away, hence out of reach of the old
+      // proximity rule: it is set aside all the same.
+      { videoId: 'live0000001', watchedAt: T0 + 20 * 3600e3, title: 'Une vidéo mesurée',
+        channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', channelTitle: 'Chaîne A', nonResolue: false },
+      // A video from before the install: nothing covers it, it must come in.
+      { videoId: 'takeout0001', watchedAt: T0 - 86_400_000, title: 'Vue avant l’extension',
+        channelId: 'UCbbbbbbbbbbbbbbbbbbbbbb', channelTitle: 'Chaîne B', nonResolue: false },
+      // The same video as the session, but before the extension measured
+      // anything at all: it cannot be the duplicate of a measurement that does
+      // not exist.
+      { videoId: 'live0000001', watchedAt: T0 - 40 * 3600e3, title: 'Une vidéo mesurée',
+        channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', channelTitle: 'Chaîne A', nonResolue: false },
+    ], { measuredSince: T0 });
+
+    check('import : toute ligne d’une vidéo déjà mesurée est écartée',
+      importe.superseded === 2, importe);
+    check('import : les vidéos jamais mesurées entrent',
+      importe.inserted === 2, importe);
+
+    tout = await db.getAllHistory();
+    check('import : aucun doublon de séance en base',
+      tout.filter((e) => e.videoId === 'live0000001').length === 3,
+      tout.filter((e) => e.videoId === 'live0000001').map((e) => [e.source, e.watchedAt]));
+    check('import : la ligne antérieure au relevé est bien celle qui est entrée',
+      tout.some((e) => e.videoId === 'live0000001' && e.source === 'takeout'
+        && e.watchedAt === T0 - 40 * 3600e3));
+
+    // With no reading start date, nothing protects the past any more: that is
+    // the behaviour wanted by default, the caller supplies the date when it has
+    // it.
+    const strict = await db.putHistory([
+      { videoId: 'live0000001', watchedAt: T0 - 80 * 3600e3, title: 'Une vidéo mesurée',
+        channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', channelTitle: 'Chaîne A', nonResolue: false },
+    ]);
+    check('import : sans date de relevé, la règle vidéo s’applique à tout',
+      strict.inserted === 0 && strict.superseded === 1, strict);
+
+    // Importing the same file again must still add nothing.
+    const rejoue = await db.putHistory([
+      { videoId: 'takeout0001', watchedAt: T0 - 86_400_000, title: 'Vue avant l’extension',
+        channelId: 'UCbbbbbbbbbbbbbbbbbbbbbb', channelTitle: 'Chaîne B', nonResolue: false },
+    ]);
+    check('import : réimporter le même export ne duplique rien',
+      rejoue.inserted === 0 && rejoue.duplicates === 1, rejoue);
+
+    // -- comptage -----------------------------------------------------------
+    const releve = await db.getWatchSessionStats();
+    check('relevé : seules les séances mesurées sont comptées',
+      releve.count === 2, releve);
+    check('relevé : la date retenue est celle de la plus ancienne',
+      releve.since === T0, [releve.since, T0]);
+    check('relevé : le temps mesuré est cumulé',
+      releve.seconds === 510, releve.seconds);
+
+    // -- homogeneous export ---------------------------------------------------
+    // The whole point of the file is that a Takeout line and a measured line read
+    // the same: same fields, in the same order, even if they are worth null.
+    const lignes = await db.exportHistory(await db.getAllDurations());
+    const champs = ['videoId', 'title', 'channelId', 'channelTitle', 'watchedAt',
+      'watchedAtIso', 'durationSec', 'watchedSec', 'watchedRatio', 'completed',
+      'resolved', 'source'];
+    check('export : toutes les lignes de la base y sont',
+      lignes.length === (await db.getAllHistory()).length, lignes.length);
+    check('export : chaque ligne porte exactement les mêmes champs',
+      lignes.every((l) => champs.every((c) => c in l) && Object.keys(l).length === champs.length),
+      Object.keys(lignes[0] ?? {}));
+    check('export : les lignes sont triées du plus ancien au plus récent',
+      lignes.every((l, i) => i === 0 || lignes[i - 1].watchedAt <= l.watchedAt));
+
+    const mesuree = lignes.find((l) => l.source === 'live' && l.watchedSec === 420);
+    check('export : une ligne mesurée porte sa part regardée',
+      mesuree && mesuree.watchedRatio === 0.2333, mesuree);
+    const importee = lignes.find((l) => l.videoId === 'takeout0001');
+    check('export : une ligne Takeout porte les mêmes champs, à null',
+      importee && importee.watchedSec === null && importee.watchedRatio === null, importee);
+    check('export : la durée connue par ailleurs complète les lignes Takeout',
+      lignes.filter((l) => l.videoId === 'live0000001')
+        .every((l) => l.durationSec === 1800),
+      lignes.filter((l) => l.videoId === 'live0000001').map((l) => l.durationSec));
+
+    // -- channel records without Shorts --------------------------------------
+    // The list of Shorts and the flag that goes with it must survive partial
+    // writes: it is the flag that decides whether a channel has to be enriched
+    // again, and erasing it would restart the recovery endlessly.
+    await db.putHistoChannel({
+      channelId: 'UCaaaaaaaaaaaaaaaaaaaaaa', meanSec: 2700, sampled: 40,
+      uploads: ['long1', 'long2'], shorts: ['court1', 'court2'], avatarUrl: null,
+    });
+    let fiches = await db.getHistoChannels();
+    check('chaîne : les Shorts sont retenus à part des uploads',
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').shorts.join() === 'court1,court2',
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').shorts);
+    check('chaîne : la fiche est marquée comme enrichie sans Shorts',
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').sansShorts === true);
+    check('chaîne : les uploads ne contiennent que des longs formats',
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').uploads.join() === 'long1,long2');
+
+    await db.putHistoAvatar('UCaaaaaaaaaaaaaaaaaaaaaa', 'https://exemple/av.jpg');
+    await db.putHistoFailure('UCaaaaaaaaaaaaaaaaaaaaaa');
+    fiches = await db.getHistoChannels();
+    check('chaîne : un rattrapage d’avatar puis un échec ne perdent pas les Shorts',
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').shorts.length === 2,
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').shorts);
+    check('chaîne : ni le drapeau, sinon la chaîne serait ré-enrichie sans fin',
+      fiches.get('UCaaaaaaaaaaaaaaaaaaaaaa').sansShorts === true);
+
+    // A record written before the fix has no flag: that is what makes it
+    // possible to spot it and do it again.
+    await db.putHistoAvatar('UCcccccccccccccccccccc', 'https://exemple/b.jpg');
+    check('chaîne : une fiche d’avant la correction reste à refaire',
+      (await db.getHistoChannels()).get('UCcccccccccccccccccccc').sansShorts === false);
+
+    // -- sauvegarde ---------------------------------------------------------
+    const sauvegarde = await db.exportUserData();
+    check('sauvegarde : les séances mesurées y sont',
+      sauvegarde.history.filter((s) => s.source === 'live').length === 2,
+      sauvegarde.history?.length);
+    // Version 1 left the Takeout rows out, on the grounds that Google reissues
+    // an export on demand. It does, days later, and it knows nothing of the
+    // seconds actually watched: an import made the day before a backup
+    // disappeared on restore.
+    check('sauvegarde : les lignes Takeout y sont aussi désormais',
+      sauvegarde.history.length >= 2, sauvegarde.history.length);
+
+    // Restoring onto a truncated database must give back exactly what was missing.
+    await db.withTx('history', 'readwrite', (tx) =>
+      new Promise((res) => {
+        const r = tx.objectStore('history').delete(`live0000001|${T0}`);
+        r.onsuccess = () => res();
+      }));
+    check('sauvegarde : la séance a bien été retirée pour l’essai',
+      (await db.getWatchSessionStats()).count === 1);
+
+    const restaure = await db.importUserData(sauvegarde);
+    check('sauvegarde : la restauration rend la séance manquante',
+      restaure.sessions === 1, restaure);
+    check('sauvegarde : et n’écrase pas celles restées en place',
+      (await db.getWatchSessionStats()).count === 2);
+
+    const score = document.getElementById('score');
+    score.textContent = fail ? `${fail} échec(s) sur ${pass + fail}` : `${pass} vérifications au vert`;
+    score.className = fail ? 'ko' : 'ok';
+  </script>
+</body>
+</html>

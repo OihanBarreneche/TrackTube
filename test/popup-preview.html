@@ -1,0 +1,190 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube — aperçu de la popup</title>
+<style>
+  body {
+    margin: 0;
+    background: #1c1c1c;
+    color: #ddd;
+    font: 13px/1.5 Roboto, system-ui, sans-serif;
+    display: flex;
+    gap: 24px;
+    padding: 24px;
+    align-items: flex-start;
+  }
+  iframe {
+    border: 1px solid #444;
+    border-radius: 10px;
+    width: 400px;
+    height: 600px;
+    background: #0f0f0f;
+  }
+  .notes { max-width: 460px; }
+  h1 { font-size: 15px; margin: 0 0 8px; }
+  p { color: #999; font-size: 12px; }
+  code { color: #f1f1f1; }
+</style>
+
+<div class="notes">
+  <h1>Aperçu de la popup</h1>
+  <p>
+    La vraie <code>popup.html</code>, avec un faux <code>chrome</code> qui répond
+    des chiffres plausibles. Elle sert à vérifier la mise en page et la taille,
+    que l'on ne voit pas autrement sans recharger l'extension.
+  </p>
+  <p>
+    Le stockage est en mémoire : rien n'est conservé d'un rechargement à
+    l'autre.
+  </p>
+  <pre id="log" style="color:#8f8;font-size:11px"></pre>
+</div>
+
+<iframe id="popup"></iframe>
+
+<script type="module">
+  const REPONSES = {
+    'sync:state': {
+      ok: true,
+      state: { lastTickAt: Date.now() - 12 * 60 * 1000, uulfAlarm: { raised: false } },
+      stats: { activeChannels: 412, visible: 1863, hidden: 5209, total: 7072 },
+      cost: { requestsPerDay: 2840, bytesPerDay: 45e6 },
+      cadence: { effective: 'auto', chaines: 412, medianIntervalMs: 95 * 60 * 1000, avecLives: 23 },
+      harvest: { count: 48, oldestPublishedAt: Date.now() - 3 * 86400e3 },
+      lastHarvest: Date.now() - 60e3,
+    },
+    'feed:counts': {
+      ok: true,
+      lastSyncAt: Date.now() - 12 * 60 * 1000,
+      counts: { total: 1863, hidden: 5209, upcoming: 4, starred: 17, inProgress: 9, byPeriod: { 1: 63, 7: 388, 30: 1502 } },
+    },
+    'feed:pulse': (() => {
+      const jour = (i) => { const d = new Date(); d.setDate(d.getDate() - i); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+      const parJour = {};
+      [12, 31, 8, 19, 44, 27, 15].forEach((n, i) => { parJour[jour(6 - i)] = n; });
+      return {
+        ok: true,
+        pulse: {
+          perDay: parJour,
+          topWeek: [
+            { channelId: 'c1', title: 'ScienceEtonnante', count: 9 },
+            { channelId: 'c2', title: 'Nota Bene', count: 7 },
+            { channelId: 'c3', title: 'Un créateur au nom vraiment très long', count: 5 },
+            { channelId: 'c4', title: 'Micode', count: 3 },
+            { channelId: 'c5', title: 'Arte', count: 2 },
+          ],
+          topMonth: [
+            { channelId: 'c2', title: 'Nota Bene', count: 28 },
+            { channelId: 'c1', title: 'ScienceEtonnante', count: 21 },
+            { channelId: 'c5', title: 'Arte', count: 18 },
+          ],
+        },
+      };
+    })(),
+    'popup:highlights': {
+      ok: true,
+      triage: { perWeek: 218, silent: 37, neverWatched: 12, mostlyHidden: 8 },
+      history: [
+        { key: 'acc.hist.jour', n: 41, at: Date.now() - 212 * 86400e3 },
+        { key: 'acc.hist.chaine', n: 318, text: 'ScienceEtonnante' },
+        { key: 'acc.hist.heure', n: 964, hour: 22 },
+        { key: 'acc.hist.serie', n: 63 },
+        { key: 'acc.hist.temps', n: 47 },
+        { key: 'acc.hist.chaines', n: 512 },
+      ],
+    },
+    'triage:progress': { ok: true, progress: { decided: Object.fromEntries(Array.from({length: 128}, (_, i) => ['c' + i, true])) } },
+    'history:summary': {
+      ok: true,
+      summary: { count: 9412, from: Date.now() - 952 * 86400e3, to: Date.now() - 86400e3 },
+      liveSince: Date.now() - 40 * 86400e3, liveSessions: 214, liveSeconds: 512000,
+    },
+  };
+
+  const params = new URL(location.href).searchParams;
+  const keys = { 'sync:state':'ytfeed:uiState', 'feed:counts':'ytfeed:uiCounts',
+    'feed:pulse':'ytfeed:feedPulse', 'history:summary':'ytfeed:histSummary', 'popup:highlights':'ytfeed:uiHighlights' };
+  // `?lang=en` renders the bench against the English catalogue. The two sides
+  // are kept at strict parity by a test, but parity is not layout: an English
+  // string is routinely a third longer, and the README and the store listing
+  // are written from this side. Without a parameter the only way to see it was
+  // to change the setting inside the installed extension.
+  const benchLang = new URL(location.href).searchParams.get('lang');
+  // `?shot=popup` puts the frame at the popup's real size, in the corner,
+  // so `tools/shoot.py` can crop a known rectangle instead of hunting for it.
+  if (new URL(location.href).searchParams.get('shot') === 'popup') {
+    addEventListener('DOMContentLoaded', () => {
+      const frame = document.querySelector('iframe');
+      Object.assign(frame.style, { position: 'fixed', left: '20px', top: '20px',
+        width: '400px', height: '600px', border: '0' });
+      document.body.style.background = '#0f0f0f';
+    });
+  }
+
+  const stockage = benchLang ? { 'ytfeed:lang': benchLang } : {};
+  if (params.has('cached')) {
+    for (const [type,key] of Object.entries(keys)) stockage[key] = structuredClone(REPONSES[type]);
+    stockage['ytfeed:uiCounts'].counts.byPeriod[1] = 23;
+    stockage['ytfeed:histSummary'].summary.count = 1234;
+  }
+  window.benchStorage = stockage;
+
+  const chrome = {
+    runtime: {
+      id: 'bench',
+      getURL: (p) => '/' + p,
+      getManifest: () => ({ version: '0.89.0' }),
+      connect: () => ({ disconnect() {}, postMessage() {} }),
+      sendMessage: async (msg) => {
+        await new Promise(r => setTimeout(r, Number(params.get('slowWorker')) || 0));
+        if (params.has('failed') && keys[msg.type]) return {ok:false};
+        if (keys[msg.type]) stockage[keys[msg.type]] = structuredClone(REPONSES[msg.type]);
+        if (msg.type === 'feed:counts') await new Promise(r => setTimeout(r, Number(new URL(location.href).searchParams.get('slowCounts')) || 0));
+        return REPONSES[msg.type] ?? { ok: true };
+      },
+      onMessage: { addListener() {}, removeListener() {} },
+      lastError: null,
+    },
+    storage: {
+      local: {
+        async get(cle) {
+          if (cle == null) return { ...stockage };
+          if (typeof cle === 'string') return cle in stockage ? { [cle]: stockage[cle] } : {};
+          if (Array.isArray(cle)) return Object.fromEntries(cle.filter(k => k in stockage).map(k => [k, stockage[k]]));
+          return Object.fromEntries(Object.keys(cle).map((k) => [k, stockage[k] ?? cle[k]]));
+        },
+        async set(obj) { Object.assign(stockage, obj); },
+        async remove(cle) { delete stockage[cle]; },
+      },
+      onChanged: { addListener() {} },
+    },
+    tabs: {
+      async query() { return []; },
+      async create({ url }) { log(`ouvrirait ${url}`); },
+      async update() {},
+    },
+    downloads: { async download() {} },
+  };
+
+  const log = (t) => { document.getElementById('log').textContent += t + '\n'; };
+
+  // The popup is loaded as it is, inside an iframe whose context is populated
+  // before its scripts run. `srcdoc` would not be enough: the scripts would
+  // start before the fake `chrome` could be laid down.
+  const iframe = document.getElementById('popup');
+  const html = await (await fetch('../src/popup/popup.html')).text();
+
+  iframe.addEventListener('load', () => {
+    log('popup chargée');
+  }, { once: true });
+
+  const doc = iframe.contentDocument;
+  doc.open();
+  doc.write(html.replace('<head>', '<head><base href="../src/popup/">'));
+  doc.close();
+
+  // Laid after `document.write`, but before the written document's deferred
+  // scripts run: `window.close` is neutralised on the way, otherwise a click on
+  // "Open my feed" would empty the preview.
+  iframe.contentWindow.chrome = chrome;
+  iframe.contentWindow.close = () => log('fermerait la popup');
+</script>

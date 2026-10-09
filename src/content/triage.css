@@ -1,0 +1,398 @@
+/**
+ * Triaging the subscriptions — full screen over YouTube.
+ *
+ * The colours follow YouTube's theme variables where they exist, with dark
+ * fallback values: this view is modal, it must not depend on the page it
+ * covers.
+ */
+
+html.tracktube-triage-open { overflow: hidden; }
+
+/* The subscriptions page stays loaded behind — the applying step will need it
+   — but it must not show through the veil. `visibility` rather than `display`:
+   hiding the layout would cause a full recomputation, and YouTube would reload
+   the list on the way back. */
+html.tracktube-triage-open ytd-app { visibility: hidden; }
+html.tracktube-triage-open #tracktube-triage { visibility: visible; }
+
+#tracktube-triage {
+  /* Same palette as the feed, the popup and the analysis page: the solid indigo
+     carries the action, the light one selection and states. The feed's
+     gold does not come down here, it points at a priority video only. */
+  --tracktube-action: #5b4bf5;
+  --tracktube-accent: #9d8bff;
+
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, .92);
+  color: var(--yt-spec-text-primary, #e9e9f5);
+  font-family: Roboto, Arial, sans-serif;
+
+  /* The card leaves the screen to the right or the left. Under `overflow: auto`,
+     that overflow made a horizontal scrollbar appear for one frame, and its
+     height shifted all the content upwards. So we cut the X axis: what leaves
+     has no reason to be reachable. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Scrolling must not propagate to YouTube's page behind. */
+  overscroll-behavior: contain;
+}
+
+#tracktube-triage h2 { margin: 0 0 8px; font-size: 22px; font-weight: 600; }
+#tracktube-triage h3 { margin: 12px 0 4px; font-size: 20px; font-weight: 600; text-align: center; }
+#tracktube-triage p { margin: 0; }
+
+/* --------------------------------------------------------------- panels --- */
+
+.tracktube-triage-panel {
+  width: min(560px, 100%);
+  padding: 28px;
+  border-radius: 16px;
+  background: #11111c;
+  border: 1px solid #25253c;
+}
+
+.tracktube-triage-lead { color: #9a9ab0; font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+
+/* Background information: an export's progress, an action's result. With no
+   colour of its own — the blue it used to carry made it read as one more
+   warning, when it asks for nothing. */
+.tracktube-triage-notice {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid #38384a;
+  background: rgba(255, 255, 255, .04);
+  color: #9a9ab0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tracktube-triage-warning {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid var(--tracktube-action);
+  background: color-mix(in srgb, var(--tracktube-action) 12%, transparent);
+  color: #cfc7ff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Neutral, and only the bold opening takes the colour: tinted throughout, this
+   block read as a second warning right under the first, when what it offers is
+   a shortcut. */
+.tracktube-triage-dormant {
+  margin: 16px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .04);
+  color: #9a9ab0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tracktube-triage-dormant strong { color: var(--tracktube-accent); }
+
+/* Empty, it left a grey bar under the confirmation's buttons: the block only
+   exists when it has something to say. */
+.tracktube-triage-notice:empty { display: none; }
+
+.tracktube-triage-orders { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.tracktube-triage-label { width: 100%; color: #9a9ab0; font-size: 12px; }
+
+.tracktube-triage-checklist {
+  max-height: 300px;
+  overflow: auto;
+  margin: 14px 0 4px;
+  border: 1px solid #25253c;
+  border-radius: 10px;
+}
+
+.tracktube-triage-checkrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13.5px;
+}
+
+.tracktube-triage-checkrow:nth-child(odd) { background: rgba(255, 255, 255, .03); }
+.tracktube-triage-checkrow:hover { background: rgba(255, 255, 255, .07); }
+.tracktube-triage-checkrow input { accent-color: var(--tracktube-action); width: 15px; height: 15px; flex: none; }
+
+.tracktube-triage-checkname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tracktube-triage-checkdate { color: #7e7e96; font-size: 12px; flex: none; }
+
+/* Progress of the sliding queue, under the card's buttons. Discreet: this is
+   background information, not an action. */
+.tracktube-triage-run {
+  margin: 14px 0 0;
+  color: #82829c;
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.tracktube-triage-actions { display: flex; gap: 10px; margin-top: 22px; }
+
+/* -------------------------------------------------------------- buttons --- */
+
+#tracktube-triage button {
+  border: 1px solid #25253c;
+  border-radius: 10px;
+  background: #21212d;
+  color: #e9e9f5;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.2;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+#tracktube-triage button:hover:not(:disabled) { background: #2d2d3a; }
+#tracktube-triage button:disabled { opacity: .4; cursor: default; }
+
+.tracktube-triage-primary {
+  background: var(--tracktube-action) !important;
+  border-color: var(--tracktube-action) !important;
+  color: #fff !important;
+}
+.tracktube-triage-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tracktube-action) 85%, #fff) !important;
+}
+
+/* The secondary ones have neither ground nor border: on a panel offering a
+   single action, anything framed reads as a primary button. That is what made
+   "Close" the most visible element on the screen. */
+.tracktube-triage-ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: #9a9ab0 !important;
+}
+.tracktube-triage-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, .08) !important;
+  color: #e9e9f5 !important;
+}
+
+.tracktube-triage-chip { padding: 7px 12px !important; font-size: 13px !important; }
+.tracktube-triage-chip[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--tracktube-accent) 16%, transparent) !important;
+  border-color: var(--tracktube-accent) !important;
+  color: var(--tracktube-accent) !important;
+}
+
+/* ----------------------------------------------------------------- card --- */
+
+/* Wider than the welcome panel: the card carries twelve stills, and four per
+   row need room to stay readable. */
+.tracktube-triage-stage { width: min(820px, 100%); }
+
+.tracktube-triage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #9a9ab0;
+  font-size: 13px;
+}
+
+.tracktube-triage-close {
+  padding: 4px 10px !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+.tracktube-triage-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: #25253c;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.tracktube-triage-progress i { display: block; height: 100%; background: var(--tracktube-action); transition: width .2s; }
+
+.tracktube-triage-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 24px 20px;
+  border-radius: 18px;
+  background: #11111c;
+  border: 1px solid #25253c;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+  /* The gesture is horizontal: we leave vertical scrolling to the browser while
+     reserving the X axis, otherwise a drag on a touch screen would scroll the
+     page instead of moving the card. */
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+
+.tracktube-triage-card:active { cursor: grabbing; }
+
+/* Elastic return when one lets go before the threshold, and exit when one
+   passes it. The transition is only active at those two moments: during the
+   drag, the card must stick to the pointer with no lag. */
+.tracktube-triage-card.is-springing { transition: transform .22s cubic-bezier(.2, .9, .3, 1.2); }
+
+/* An exit long enough to be plainly readable: one must see which way the card
+   goes, not merely guess that something happened. */
+.tracktube-triage-card.is-leaving {
+  transition: transform .3s ease-in, opacity .3s ease-in;
+  opacity: 0;
+}
+
+/* -------------------------------------------------------- triage veil --- */
+
+/* `--tracktube-drag` goes from -1 (fully left) to +1 (fully right), and
+   `--tracktube-drag-abs` gives its absolute value.
+
+   The gradient's extent grows with the gesture, it is no longer fixed: at full
+   throw, the colour covers half the card instead of stopping short. The veil
+   therefore follows the movement all the way, instead of freezing its progress
+   half way. */
+.tracktube-triage-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  --tracktube-spread: calc(var(--tracktube-drag-abs, 0) * 55%);
+  background:
+    linear-gradient(90deg,
+      rgba(210, 40, 40, calc(var(--tracktube-drag, 0) * -0.75)) 0%,
+      transparent var(--tracktube-spread)),
+    linear-gradient(270deg,
+      rgba(35, 170, 90, calc(var(--tracktube-drag, 0) * 0.75)) 0%,
+      transparent var(--tracktube-spread));
+}
+
+.tracktube-triage-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #25253c;
+}
+
+.tracktube-triage-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 34px/1 Roboto, Arial, sans-serif;
+  color: #fff;
+}
+
+/* The channel's size and handle, right under its name. The same reserved
+   height as the rest: a channel with no known count must not make the card
+   jump. */
+.tracktube-triage-sub {
+  margin: 2px 0 0;
+  min-height: 18px;
+  text-align: center;
+  color: #82829c;
+  font-size: 13px;
+}
+
+/* Reserved heights. Not every channel has the same amount of information —
+   some have neither a known cadence nor a hiding rate — and without the reserve
+   the card changed size on every pass, making the centred header above it
+   jump. */
+.tracktube-triage-facts {
+  margin: 8px 0 16px;
+  /* Four possible lines since "what you have watched of it" joined the other
+     three. The height is reserved for the maximum, otherwise the card changes
+     size from one channel to the next and the header jumps above it. */
+  min-height: 108px;
+  text-align: center;
+  color: #9a9ab0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#tracktube-triage h3 {
+  min-height: 28px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The triage's most telling signal: it has to stand out from the rest. The
+   desaturated accent is enough; gold is reserved for priority videos. */
+.tracktube-triage-flag {
+  margin-top: 8px !important;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--tracktube-accent) 14%, transparent);
+  color: var(--tracktube-accent);
+}
+
+.tracktube-triage-thumbs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  width: 100%;
+}
+
+@media (max-width: 700px) {
+  .tracktube-triage-thumbs { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* The slot takes its final place as soon as it is created, picture or no
+   picture: that is what stops the card growing before one's eyes. */
+.tracktube-triage-thumb {
+  display: block;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #21212d;
+}
+
+.tracktube-triage-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.tracktube-triage-thumb:not(.is-loading):hover { outline: 2px solid var(--tracktube-accent); }
+
+/* Taken out of sight without freeing its place: making it disappear would pull
+   the card up, exactly the jump we are trying to remove. */
+/* ------------------------------------------------------------ decisions --- */
+
+.tracktube-triage-decide {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* The two decisions keep opposite colours: this is the gesture's direction,
+   not a hierarchy of action. The tint is the palette's own indigo, diluted, so
+   that it reads as the same family as the primary button. */
+.tracktube-triage-drop {
+  border-color: color-mix(in srgb, var(--tracktube-action) 45%, #25253c) !important;
+  color: var(--tracktube-accent) !important;
+}
+.tracktube-triage-drop:hover { background: color-mix(in srgb, var(--tracktube-action) 18%, transparent) !important; }
+
+.tracktube-triage-keep { border-color: #2f7d4f !important; color: #8ff0b0 !important; }
+.tracktube-triage-keep:hover { background: #12301c !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tracktube-triage-progress i { transition: none; }
+  .tracktube-triage-card.is-springing,
+  .tracktube-triage-card.is-leaving { transition: none; }
+}

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — aperçu de l'application par lot</title>
+  <style>
+    body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: Roboto, Arial, sans-serif; }
+    .note { padding: 24px; color: #aaa; font-size: 13px; line-height: 1.6; max-width: 680px; }
+    .note b { color: #fff; }
+  </style>
+</head>
+<body>
+  <p class="note">
+    <b>Banc d'essai de l'application par lot</b> — données factices, hors
+    extension. Aucun appel ne part vers YouTube&nbsp;: `subscribeChannel` et
+    `unsubscribeChannel` sont remplacés par des espions, et
+    <code>globalThis.__calls</code> les recense. Le fichier simulé recouvre
+    partiellement le compte, pour que les trois modes aient chacun quelque
+    chose à faire.
+  </p>
+
+  <script type="module">
+    const id = (c) => 'UC' + c.repeat(22);
+
+    // Fichier : A et B connus du compte, D et E inconnus.
+    const FICHIER = {
+      nom: 'liste-test.csv',
+      skipped: 1,
+      channels: [
+        { id: id('a'), title: 'ScienceEtonnante' },
+        { id: id('b'), title: 'Gotaga' },
+        { id: id('d'), title: 'Nouvelle chaîne 1' },
+        { id: id('e'), title: 'Nouvelle chaîne 2' },
+      ],
+    };
+
+    // Account: A, B, C active, plus a channel already left.
+    const ABONNEMENTS = [
+      { id: id('a'), title: 'ScienceEtonnante', active: 1 },
+      { id: id('b'), title: 'Gotaga', active: 1 },
+      { id: id('c'), title: 'MrBeast', active: 1 },
+      { id: id('f'), title: 'Déjà quittée', active: 0 },
+    ];
+
+    const stockage = {};
+    globalThis.__calls = [];
+    /** Lets the test simulate the absence or the freshness of a backup. */
+    globalThis.__lastExportAt = Date.now();
+    /** Makes the next call refused by YouTube, to see the hard stop. */
+    globalThis.__refuse = null;
+
+    globalThis.chrome = {
+      runtime: {
+        id: 'bench',
+        getURL: (p) => '../' + p,
+        async sendMessage(msg) {
+          if (msg.type === 'lot:contexte') {
+            return { ok: true, abonnements: ABONNEMENTS, lastExportAt: globalThis.__lastExportAt };
+          }
+          if (msg.type === 'subs:seen') {
+            globalThis.__calls.push(['base', msg.channelId, msg.subscribed]);
+            return { ok: true };
+          }
+          return { ok: true };
+        },
+      },
+      storage: {
+        local: {
+          async get(k) {
+            const cles = Array.isArray(k) ? k : [k];
+            return Object.fromEntries(cles.map((c) => [c, stockage[c]]).filter(([, v]) => v !== undefined));
+          },
+          async set(o) { Object.assign(stockage, o); },
+          async remove(k) {
+            for (const c of (Array.isArray(k) ? k : [k])) delete stockage[c];
+          },
+        },
+      },
+    };
+
+    stockage['ytfeed:lotFichier'] = FICHIER;
+
+    // The applying module imports the YouTube client dynamically, through an
+    // extension URL. We intercept it so that the bench never reaches the network
+    // while exercising the real orchestration code.
+    // Absolute path: `import()` would resolve a relative path from
+    // `src/content/`, not from this file.
+    const vraiGetURL = globalThis.chrome.runtime.getURL;
+    globalThis.chrome.runtime.getURL = (p) =>
+      (p.endsWith('innertube.js') ? '/test/stub-innertube.js' : vraiGetURL(p));
+
+    const { mountBulk, unmountBulk } = await import('../src/content/batch.js');
+    // The bench has to be able to replay the mounting after changing the
+    // context, for instance to check the block when no backup exists.
+    globalThis.__remonter = async () => {
+      unmountBulk();
+      stockage['ytfeed:lotFichier'] = FICHIER;
+      globalThis.__calls = [];
+      await mountBulk();
+    };
+    await mountBulk();
+  </script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+{
+  "retrievedAt": "2026-10-07",
+  "samples": [
+    {
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "publishDate": "2026-09-01T22:15:15+02:00",
+          "canonicalUrl": "https://www.youtube.com/shorts/r4orIinlASc"
+        }
+      },
+      "expectedShort": true,
+      "videoDetails": {
+        "lengthSeconds": "37",
+        "videoId": "r4orIinlASc"
+      }
+    },
+    {
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "publishDate": "2026-09-03T16:05:24+02:00",
+          "canonicalUrl": "https://www.youtube.com/shorts/rRzQL_stO1g"
+        }
+      },
+      "expectedShort": true,
+      "videoDetails": {
+        "lengthSeconds": "30",
+        "videoId": "rRzQL_stO1g"
+      }
+    },
+    {
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "publishDate": "2026-08-28T12:38:39+02:00",
+          "canonicalUrl": "https://www.youtube.com/shorts/d2_n6R7bn8w"
+        }
+      },
+      "expectedShort": true,
+      "videoDetails": {
+        "lengthSeconds": "29",
+        "videoId": "d2_n6R7bn8w"
+      }
+    },
+    {
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "publishDate": "2026-08-23T08:05:33+02:00",
+          "canonicalUrl": "https://www.youtube.com/shorts/JAdcMZbvMcs"
+        }
+      },
+      "expectedShort": true,
+      "videoDetails": {
+        "lengthSeconds": "18",
+        "videoId": "JAdcMZbvMcs"
+      }
+    },
+    {
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "publishDate": "2023-10-08T11:38:48+02:00",
+          "canonicalUrl": "https://www.youtube.com/watch?v=5OFow3ISW5A"
+        }
+      },
+      "expectedShort": false,
+      "videoDetails": {
+        "lengthSeconds": "12",
+        "videoId": "5OFow3ISW5A"
+      }
+    },
+    {
+      "retrievedAt": "2026-10-06",
+      "source": "Anonymous YouTube WEB player response, sanitized",
+      "playabilityStatus": {
+        "status": "UNPLAYABLE"
+      },
+      "videoDetails": {
+        "videoId": "LFIibTvPW6I",
+        "title": "ON TOUCHE PAS AU GOAT 🐐",
+        "channelId": "UCCFqUJYKT97UerMmb6DM0bw",
+        "lengthSeconds": "27"
+      },
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "externalVideoId": "LFIibTvPW6I",
+          "canonicalUrl": "https://www.youtube.com/shorts/LFIibTvPW6I",
+          "publishDate": "2026-10-05T11:45:41-07:00",
+          "isShortsEligible": true
+        }
+      },
+      "expectedShort": true
+    },
+    {
+      "retrievedAt": "2026-10-07",
+      "source": "Anonymous YouTube WEB player response, sanitized",
+      "playabilityStatus": {
+        "status": "UNPLAYABLE"
+      },
+      "videoDetails": {
+        "videoId": "x8Jw8NGjpbY",
+        "title": "LE MELON 😭",
+        "channelId": "UCCFqUJYKT97UerMmb6DM0bw",
+        "lengthSeconds": "19"
+      },
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "externalVideoId": "x8Jw8NGjpbY",
+          "canonicalUrl": "https://www.youtube.com/shorts/x8Jw8NGjpbY",
+          "publishDate": "2026-10-06T14:41:26-07:00",
+          "isShortsEligible": true
+        }
+      },
+      "expectedShort": true
+    }
+  ]
+}

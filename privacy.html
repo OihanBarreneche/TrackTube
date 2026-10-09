@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrackTube — confidentialité / privacy</title>
+  <style>
+    :root {color-scheme:light dark;font:16px/1.65 system-ui,sans-serif}
+    body {max-width:760px;margin:40px auto;padding:0 24px}
+    h1,h2 {line-height:1.25} a {color:light-dark(#5138ba,#bbaaff)}
+    section {margin:32px 0} li {margin:8px 0}
+    /* One language at a time. Both stay in the document so the page can be
+       hosted on its own for the store listing, with no extension behind it.
+
+       The two languages carry the same structure, heading for heading and
+       paragraph for paragraph. The English side was once a single flat section
+       of five long paragraphs against the French side's three titled ones, and
+       the same page then read as two different documents depending on the
+       button pressed. */
+    .lang {display:flex;gap:8px;margin:0 0 8px;padding:0;list-style:none}
+    .lang button {
+      font:inherit;font-size:14px;padding:4px 12px;border-radius:14px;cursor:pointer;
+      border:1px solid light-dark(#cfcfe6,#3a3a52);
+      background:light-dark(#fff,#1b1b28);color:inherit;
+    }
+    .lang button[aria-pressed="true"] {
+      background:light-dark(#5138ba,#bbaaff);color:light-dark(#fff,#15151f);border-color:transparent;
+    }
+    [hidden] {display:none}
+  </style>
+</head>
+<body>
+  <!-- The title belongs to a language too. It used to sit outside the sections,
+       so the English page was headed by a French line. -->
+  <h1><span lang="fr">TrackTube : confidentialité</span><span lang="en" hidden>TrackTube privacy notice</span></h1>
+  <ul class="lang">
+    <li><button type="button" data-lang="fr" aria-pressed="true">Français</button></li>
+    <li><button type="button" data-lang="en" aria-pressed="false">English</button></li>
+  </ul>
+
+  <section lang="fr">
+    <p>Version du 8 octobre 2026. Cette notice décrit le code de TrackTube
+    <span class="version">1.0.0</span>.</p>
+  </section>
+  <section lang="fr">
+    <h2>Données utilisées</h2>
+    <p>TrackTube conserve dans ce profil de navigateur les abonnements, métadonnées
+    de vidéos, masquages, priorités, réglages, diagnostics et un identifiant du
+    compte YouTube détecté. Cet identifiant sert à limiter le mélange de comptes.</p>
+    <p>Le relevé propre à TrackTube des vidéos ouvertes, positions, sessions et temps
+    regardé est optionnel et désactivé par défaut. Son activation se fait dans
+    l’accueil ou l’onglet Historique. Les indicateurs de visionnage déjà exposés par
+    YouTube peuvent aussi être lus pour organiser le feed. Un historique Google
+    Takeout et une sauvegarde ne sont lus que lorsque vous choisissez leur import.</p>
+  </section>
+  <section lang="fr">
+    <h2>Stockage et communications</h2>
+    <p>La base et les réglages restent dans IndexedDB et le stockage local de
+    l’extension. TrackTube n’utilise aucun serveur du développeur, outil de mesure
+    d’audience, publicité ou vente de données.</p>
+    <p>YouTube reçoit les requêtes nécessaires à la collecte des chaînes et des
+    vidéos. Les imports d’abonnements, lectures d’historique et actions sur les
+    abonnements utilisent votre session YouTube existante. Le code calcule les
+    en-têtes d’authentification nécessaires à partir des cookies accessibles dans
+    la page ; il ne demande ni mot de passe ni clé d’API personnelle, et ne sauvegarde
+    pas ces cookies dans sa base.</p>
+    <p>Les miniatures, avatars et aperçus contactent les services d’images ou de
+    vidéo utilisés par YouTube. Ces services reçoivent les requêtes réseau
+    habituelles, notamment l’adresse IP. Les masquages et priorités TrackTube ne
+    sont pas envoyés au développeur ou appliqués au feed natif YouTube.</p>
+    <p>Les aperçus au survol demandent leurs images et pistes audio/vidéo sans
+    cookies de session. Ils utilisent le lecteur propre à TrackTube, sans
+    lecteur YouTube intégré. Ces aperçus ne sont pas relevés par le suivi de
+    visionnage TrackTube.</p>
+    <p>Le tri et l’application d’une liste peuvent modifier vos abonnements
+    YouTube après vos décisions et validations. Une sauvegarde exportée est un
+    fichier local pouvant contenir votre historique et vos choix.</p>
+  </section>
+  <section lang="fr">
+    <h2>Contrôle et suppression</h2>
+    <p>Désactiver « Relever ce que je regarde » arrête les nouveaux relevés
+    TrackTube sans effacer les données déjà enregistrées. La page d’analyse
+    permet d’effacer l’historique. Désinstaller l’extension supprime son stockage
+    local ; cela n’efface ni les exports conservés ailleurs ni votre historique
+    chez YouTube.</p>
+    <p>Les données restent locales jusqu’à leur suppression. La navigation privée
+    et l’utilisation de plusieurs comptes dans un même profil ne constituent pas
+    un mode de séparation garanti. Utilisez des profils distincts.</p>
+    <p>Pour signaler un problème de confidentialité, utilisez le canal de contact
+    indiqué dans le dépôt public ou la fiche de distribution de TrackTube.</p>
+  </section>
+
+  <section lang="en" hidden>
+    <p>Updated 8 October 2026. This notice describes the code of TrackTube
+    <span class="version">1.0.0</span>.</p>
+  </section>
+  <section lang="en" hidden>
+    <h2>Data used</h2>
+    <p>TrackTube keeps, in this browser profile, your subscriptions, video
+    metadata, what you hid, what you starred, your settings, its diagnostics and
+    an identifier of the YouTube account it detected. That identifier serves to
+    limit the mixing of two accounts.</p>
+    <p>TrackTube's own record of the videos you open, of playback positions,
+    sessions and time watched is optional and off by default. You turn it on from
+    the welcome page or the History tab. The playback indicators YouTube already
+    exposes may also be read, to organise the feed. A Google Takeout history and
+    a backup are read only when you choose to import them.</p>
+  </section>
+  <section lang="en" hidden>
+    <h2>Storage and communications</h2>
+    <p>The database and the settings stay in the extension's IndexedDB and local
+    storage. TrackTube uses no server of the developer's, no audience measurement
+    tool, no advertising, and sells no data.</p>
+    <p>YouTube receives the requests needed to collect channels and videos.
+    Subscription imports, history reads and actions on subscriptions use your
+    existing YouTube session. The code computes the authentication headers it
+    needs from the cookies readable in the page; it asks for no password and no
+    personal API key, and does not save those cookies in its database.</p>
+    <p>Thumbnails, avatars and previews contact the image and video services
+    YouTube uses. Those services receive the usual network requests, your IP
+    address among them. What you hid and what you starred in TrackTube are not
+    sent to the developer, and are not applied to YouTube's own feed.</p>
+    <p>Hover previews ask for their images and their audio and video tracks
+    without session cookies. They use TrackTube's own reader, with no embedded
+    YouTube player. These previews are not recorded by TrackTube's watch
+    tracking.</p>
+    <p>Sorting your subscriptions, and applying a list to your account, can
+    change your YouTube subscriptions after your decisions and confirmations. An
+    exported backup is a local file that may contain your history and your
+    choices.</p>
+  </section>
+  <section lang="en" hidden>
+    <h2>Control and deletion</h2>
+    <p>Turning off “Track what I watch” stops new TrackTube records without
+    erasing what is already stored. The analysis page can erase the history.
+    Uninstalling the extension removes its local storage; that erases neither the
+    exports you kept elsewhere nor your history at YouTube.</p>
+    <p>The data stays local until you delete it. Private browsing, and using
+    several accounts in one profile, are not a guaranteed form of separation. Use
+    separate profiles.</p>
+    <p>To report a privacy problem, use the contact channel named in TrackTube's
+    public repository or distribution listing.</p>
+  </section>
+
+  <script src="src/pages/privacy.js"></script>
+</body>
+</html>

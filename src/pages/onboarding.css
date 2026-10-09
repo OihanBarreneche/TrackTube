@@ -1,0 +1,294 @@
+/**
+ * Welcome screen, on first launch.
+ *
+ * A full page and not the popup: the popup closes as soon as one clicks
+ * elsewhere, and this screen asks precisely that one go elsewhere (the YouTube
+ * tab for the import, Takeout for the history) and come back.
+ *
+ * The colours are the analysis page's, identically: two pages of the same
+ * extension opened side by side must look alike.
+ */
+
+:root {
+  --bg: #07070e;
+  --card: #11111c;
+  --border: #25253c;
+  --text: #e9e9f5;
+  --grey: #82829c;
+  /* The solid one for what triggers, the light one for what states a state.
+     Same two values as every other stylesheet of the extension: the palette is
+     declared per file because these pages share no stylesheet, not because they
+     are allowed to drift. */
+  --action: #5b4bf5;
+  --accent: #9d8bff;
+  --blue: #7fa8ff;
+  --green: #5ec48d;
+}
+
+* { box-sizing: border-box; }
+
+/* Same trap as on the other pages: the browser gives `hidden` only a default
+   stylesheet `display: none`, which the slightest class laying a `display`
+   silently overrides. Here every step is `display: grid`, so without this rule
+   they would all show at once. */
+[hidden] { display: none !important; }
+
+body {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14.5px/1.65 Roboto, system-ui, sans-serif;
+}
+
+a { color: var(--blue); }
+
+/* -------------------------------------------------------------- header ---- */
+
+header { margin-bottom: 26px; }
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.wordmark img { width: 28px; height: 28px; }
+
+.wordmark b { font-size: 15px; font-weight: 600; }
+.wordmark span { color: var(--grey); font-size: 12px; }
+
+/* The language and the exit, both at the end of the bar. The selector carries
+   the auto margin, the exit follows it: two auto margins would split the free
+   space and leave the pair floating in the middle. */
+#onb-lang {
+  margin-left: auto;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* "Skip": an exit, not an action. Laid at the end of the wordmark, set back,
+   so that it is found without competing with the step's button. */
+.link {
+  margin-left: 0;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--grey);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.link:hover { color: var(--text); text-decoration: underline; }
+
+/* The pips say where one is and how much is left. Clickable: whoever wants to
+   read a step again should not have to go through "Back". */
+/* The negative margin cancels the buttons' target padding: the line stays laid
+   where it was, the clickable area overflows over the empty space. */
+.steps-bar { display: flex; gap: 6px; margin: -8px 0; }
+
+/* The line is three pixels, but the click target is nineteen: the transparent
+   padding is excluded from the background by `background-clip`, which thickens
+   the reachable area without thickening the line. */
+.steps-bar button {
+  flex: 1;
+  height: 3px;
+  padding: 8px 0;
+  box-sizing: content-box;
+  background-clip: content-box;
+  border: none;
+  border-radius: 2px;
+  background-color: var(--border);
+  cursor: pointer;
+  transition: background-color .2s;
+}
+
+/* A completed step was told from #25253c by #434356, which is nothing at all
+   on a three pixel line: the indicator said where one is, never how much is
+   left. The half tint of accent says it at a glance. */
+.steps-bar button.passed { background-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.steps-bar button.active { background-color: var(--action); }
+
+/* --------------------------------------------------------------- steps ---- */
+
+.step { display: grid; gap: 14px; }
+
+h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+h2 { margin: 0; font-size: 15px; font-weight: 600; }
+
+p { margin: 0; }
+.grey { color: var(--grey); font-size: 13px; }
+
+.card {
+  display: grid;
+  gap: 8px;
+  padding: 15px 17px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+
+/* A list of bullets where the bullet carries meaning rather than decoration. */
+.bullets {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bullets li {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+/* Drawn to the same template and the same weight, rather than ten characters
+   four of which came from the system emoji font with their flats of colour: the
+   list mixed two levels of detail. `margin-top` sets the pictogram against the
+   first line of the title next to it. */
+.bullets .bullet {
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  justify-self: center;
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.bullets b { font-weight: 600; }
+.bullets p { color: var(--grey); font-size: 13px; }
+
+/* ------------------------------------------------------------- buttons ---- */
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.actions .pushed-right { margin-left: auto; }
+
+button.button {
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+button.button:hover:not(:disabled) { background: #1d1d28; }
+button.button:disabled { opacity: .45; cursor: default; }
+
+button.primary {
+  border-color: transparent;
+  background: var(--action);
+  color: #fff;
+  font-weight: 500;
+}
+
+button.primary:hover:not(:disabled) { background: #7060ff; }
+
+button.quiet {
+  border-color: transparent;
+  color: var(--grey);
+  padding: 9px 4px;
+}
+
+button.quiet:hover { background: transparent; color: var(--text); }
+
+/* --------------------------------------------------------------- import --- */
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--grey);
+}
+
+.status.done { color: var(--green); }
+.status.failed { color: #ff6b7d; }
+
+.spinner {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--action);
+  border-radius: 50%;
+  animation: tourne .8s linear infinite;
+}
+
+@keyframes tourne { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 3s; }
+}
+
+/* --------------------------------------------------------------- choice --- */
+
+/* A choice, not a checkbox lost in a form: the step asks one thing only, so
+   both answers may as well carry the same weight. */
+.choice { display: grid; gap: 10px; }
+
+.choice label {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.choice label:hover { border-color: #434356; }
+.choice label:has(input:checked) { border-color: var(--accent); background: #15132a; }
+.choice input { margin: 3px 0 0; accent-color: var(--accent); }
+.choice b { font-weight: 600; }
+.choice p { color: var(--grey); font-size: 12.5px; }
+
+/* ------------------------------------------------------------ questions --- */
+
+details {
+  border-top: 1px solid var(--border);
+  padding: 11px 0 0;
+}
+
+details + details { margin-top: 11px; }
+
+summary {
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  list-style: none;
+}
+
+summary::-webkit-details-marker { display: none; }
+summary::before { content: '＋ '; color: var(--grey); }
+details[open] summary::before { content: '－ '; }
+details p { margin-top: 9px; color: var(--grey); font-size: 13px; }

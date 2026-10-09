@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<title>TrackTube — lecture des aperçus</title>
+<style>
+  :root { --yt-spec-text-primary:#eee; --yt-spec-text-secondary:#aaa; --yt-spec-base-background:#111; color-scheme:dark; }
+  body { font-family:Arial,sans-serif; margin:0; background:#111; color:#eee; }
+  header { position:sticky; top:0; height:56px; z-index:2000; background:#222; padding:0 20px; }
+  #content { margin:0 24px; max-width:1200px; }
+
+</style>
+<link rel="stylesheet" href="../src/content/feed-view.css">
+<header>Lecture locale, données factices, aucun compte YouTube</header>
+<main id="content"><ytd-browse page-subtype="subscriptions"><ytd-rich-grid-renderer></ytd-rich-grid-renderer></ytd-browse></main>
+<script type="module">
+  // Real production MediaSource and HTMLVideoElement; no ytd-player double.
+  window.previewBench = { players:[], imageCalls:{}, metadataDelay:500, messages:[] };
+  new MutationObserver(records=>{
+    for(const record of records)for(const node of record.addedNodes){
+      if(node.nodeType!==1)continue;
+      const videos=node.matches('video')?[node]:[...node.querySelectorAll('video')];
+      for(const video of videos)if(!window.previewBench.players.some(p=>p.video===video))
+        window.previewBench.players.push({video,host:video.parentElement,id:video.closest('[data-video-id]')?.dataset.videoId});
+    }
+  }).observe(document.documentElement,{subtree:true,childList:true});
+  const channel={id:'UC'+'x'.repeat(22),title:'Chaîne test'};
+  const image='/test/fixtures/preview-sheet.svg';
+  channel.avatarUrl=image;
+  const videos=Array.from({length:9},(_,i)=>({id:'preview000'+i,channelId:channel.id,
+    channelTitle:channel.title,title:'Aperçu '+i,publishedAt:Date.now()-i*1000,durationSec:40,
+    thumbUrl:image,shortVerifiedAt:Date.now(),shortValidUntil:Date.now()+900000}));
+  window.chrome={runtime:{id:'bench',getURL:p=>p==='src/content/innertube.js'?'/test/preview-innertube.js':'/'+p,
+    getManifest:()=>({version:'test'}),onMessage:{addListener:()=>{}},sendMessage:async msg=>{
+      if(msg.type==='subs:list')return{ok:true,channels:[channel]};
+      if(msg.type==='feed:page')return{ok:true,items:videos,nextCursor:null};
+      if(msg.type==='feed:counts')return{ok:true,counts:{total:9,hidden:0,byPeriod:{1:9,7:9}}};
+      return{ok:true};
+    }},storage:{local:{get:async k=>k==='ytfeed:columns'?{[k]:3}:{},set:async()=>{}},onChanged:{addListener:()=>{}}}};
+  const {mountFeedView}=await import('../src/content/feed-view.js');
+  await mountFeedView();
+  document.body.dataset.ready='true';
+</script>
+</html>

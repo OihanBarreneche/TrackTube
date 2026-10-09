@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — aperçu du tri des abonnements</title>
+  <style>
+    body { margin: 0; background: #0f0f0f; color: #f1f1f1; font-family: Roboto, Arial, sans-serif; }
+    .note { padding: 24px; color: #aaa; font-size: 13px; line-height: 1.6; max-width: 640px; }
+    .note b { color: #fff; }
+  </style>
+</head>
+<body>
+  <p class="note">
+    <b>Banc d'essai du tri des abonnements</b> — données factices, hors extension.
+    L'écran devrait se superposer à cette page. Les cas couverts : chaîne active,
+    chaîne muette depuis des années, chaîne dont on masque systématiquement les
+    vidéos, chaîne sans avatar.
+  </p>
+
+  <script type="module">
+    const DAY = 86400e3, MONTH = 30 * DAY, now = Date.now();
+
+    const CHANNELS = [
+      { id: 'UC' + 'a'.repeat(22), title: 'ScienceEtonnante', avatarUrl: '',
+        addedAt: now - 900 * DAY, lastUploadAt: now - 12 * DAY, uploadIntervalMs: 20 * DAY,
+        videoCount: 15, hiddenCount: 1, watchedCount: 6 },
+      { id: 'UC' + 'b'.repeat(22), title: 'Chaîne abandonnée', avatarUrl: '',
+        addedAt: now - 1600 * DAY, lastUploadAt: now - 34 * MONTH, uploadIntervalMs: 45 * DAY,
+        videoCount: 12, hiddenCount: 0, watchedCount: 0 },
+      { id: 'UC' + 'c'.repeat(22), title: 'Je masque tout d’eux', avatarUrl: '',
+        addedAt: now - 500 * DAY, lastUploadAt: now - 3 * DAY, uploadIntervalMs: 4 * DAY,
+        videoCount: 14, hiddenCount: 12, watchedCount: 0 },
+      { id: 'UC' + 'd'.repeat(22), title: 'Avatar cassé', avatarUrl: location.origin + '/inexistant.jpg',
+        addedAt: now - 100 * DAY, lastUploadAt: now - 40 * DAY, uploadIntervalMs: 90 * DAY,
+        videoCount: 4, hiddenCount: 0, watchedCount: 1 },
+    ];
+
+    // `?thumbs` dresses the bench for a screenshot: drawn thumbnails in place of
+    // the empty ones, invented names in place of the four case labels. The
+    // default stays bare because those four cases — the broken avatar, the
+    // channel silent for years, the one whose videos are all hidden — are what
+    // the bench is for, and a screenshot of them would advertise the edge cases.
+    const SHOW = new URL(location.href).searchParams.has('thumbs');
+    const SHOT = new URL(location.href).searchParams.get('shot') === 'drag';
+    const PALETTE = [['#1f3a5f', '#3d6ea5'], ['#4a2b4d', '#8b5a96'], ['#1f4740', '#3e8a76'],
+      ['#5a3520', '#a86a3d'], ['#2b2f55', '#5a62a8'], ['#4d2626', '#9c4a4a']];
+    const drawn = (i) => {
+      const [dark, light] = PALETTE[i % PALETTE.length];
+      return 'data:image/svg+xml,' + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180">'
+        + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+        + `<stop offset="0" stop-color="${dark}"/><stop offset="1" stop-color="${light}"/>`
+        + '</linearGradient></defs><rect width="320" height="180" fill="url(#g)"/>'
+        + `<circle cx="${40 + (i * 37) % 240}" cy="${40 + (i * 53) % 100}" r="46" fill="#fff" opacity=".07"/>`
+        + `<circle cx="${210 - (i * 29) % 160}" cy="${130 - (i * 19) % 70}" r="30" fill="#fff" opacity=".05"/>`
+        + '</svg>');
+    };
+    let VIDEOS_BY_CHANNEL = null;
+
+    // Real identity and real publishing facts; the viewer's state stays the
+    // bench's own, since no public feed carries it. See the fixture's note.
+    const real = SHOW ? await (await fetch('fixtures/real-feed.json')).json() : null;
+    if (SHOW) {
+      // Avatars from the cache `tools/shoot.py` fills, when it is there: six
+      // probes racing the network paint a different channel as an initial on
+      // every run, and a screenshot tool that does that is not a tool.
+      const cached = await fetch('fixtures/.avatars/index.json')
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (cached) {
+        for (const c of real.channels) {
+          if (cached[c.id]) c.avatarUrl = new URL('fixtures/' + cached[c.id], location.href).href;
+        }
+      }
+    }
+    if (SHOW) {
+      const byChannel = new Map();
+      for (const v of real.videos) {
+        if (!byChannel.has(v.channelId)) byChannel.set(v.channelId, []);
+        byChannel.get(v.channelId).push(v);
+      }
+      // Four channels, named rather than sliced off the top, and each given a
+      // viewer state of its own. Pairing them with the bench's four case
+      // profiles by index was worse than arbitrary: it put "you hid 12 of its
+      // last 14 videos" under whichever name landed on that index.
+      //
+      // The screen is still left to rank them, and it puts Vsauce first on a
+      // fact: its last upload really is from July 2025, and `suspicionScore`
+      // weighs inactivity at 0.45. That is the case this screen was built for.
+      const WANTED = [
+        { title: 'Vsauce', videoCount: 12, hiddenCount: 0, watchedCount: 2 },
+        { title: 'SmarterEveryDay', videoCount: 12, hiddenCount: 1, watchedCount: 7 },
+        { title: 'MrBeast', videoCount: 12, hiddenCount: 2, watchedCount: 5 },
+        { title: 'Veritasium', videoCount: 12, hiddenCount: 0, watchedCount: 9 },
+      ];
+      CHANNELS.length = 0;
+      for (const want of WANTED) {
+        const source = real.channels.find((c) => c.title === want.title);
+        if (!source) continue;
+        const dates = (byChannel.get(source.id) || [])
+          .map((v) => Date.parse(v.publishedAt)).sort((a, b) => b - a);
+        const gaps = dates.slice(1).map((at, k) => dates[k] - at);
+        CHANNELS.push({
+          id: source.id,
+          title: source.title,
+          avatarUrl: source.avatarUrl,
+          addedAt: now - 900 * DAY,
+          lastUploadAt: dates[0] ?? now - 30 * DAY,
+          uploadIntervalMs: gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : 30 * DAY,
+          videoCount: want.videoCount,
+          hiddenCount: want.hiddenCount,
+          watchedCount: want.watchedCount,
+        });
+      }
+      VIDEOS_BY_CHANNEL = byChannel;
+      document.querySelector('body > p')?.remove();
+    }
+
+    const SHOW_TITLES = [
+      'The quiet physics of a paper airplane',
+      'Reading a city by its street widths',
+      'One microphone, one room, one take',
+      'What a year of measurements showed',
+      'The map projection argument, settled',
+      'Why that answer is incomplete',
+      'Three hours of deep focus',
+      'How a tokamak holds plasma',
+    ];
+
+    const videosFor = (channelId, offset, limit) => {
+      const real = VIDEOS_BY_CHANNEL?.get(channelId);
+      if (real) {
+        // The channel's own videos, with YouTube's own thumbnails. There are
+        // four of them per channel in the fixture, and the card repeats them to
+        // fill its grid rather than invent any.
+        return Array.from({ length: Math.max(0, Math.min(limit, real.length - offset)) }, (_, i) => {
+          const v = real[offset + i];
+          return {
+            id: v.id,
+            title: v.title,
+            thumbUrl: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
+            publishedAt: Date.parse(v.publishedAt),
+          };
+        });
+      }
+      return Array.from({ length: Math.max(0, Math.min(limit, 14 - offset)) }, (_, i) => ({
+        id: (channelId.slice(2, 6) + String(offset + i)).padEnd(11, 'z').slice(0, 11),
+        title: SHOW ? SHOW_TITLES[(offset + i) % SHOW_TITLES.length] : `Vidéo ${offset + i + 1}`,
+        thumbUrl: SHOW ? drawn(offset + i) : '',
+        publishedAt: now - (offset + i) * 5 * DAY,
+      }));
+    };
+
+    // Progress persisted, as the service worker does in the database.
+    let progress = null;
+
+    // `?lang=en` renders the bench against the English catalogue. The two sides
+    // are kept at strict parity by a test, but parity is not layout: an English
+    // string is routinely a third longer, and the README and the store listing
+    // are written from this side. Without a parameter the only way to see it was
+    // to change the setting inside the installed extension.
+    const benchLang = new URL(location.href).searchParams.get('lang');
+
+    globalThis.chrome = {
+      runtime: {
+        id: 'bench',
+        getURL: (p) => '../' + p,
+        async sendMessage(msg) {
+          if (msg.type === 'triage:channels') {
+            // `?shot` says a backup was taken an hour ago, so the entry
+            // confirmation does not stand in front of the picture.
+            return { ok: true, channels: CHANNELS,
+              lastExportAt: SHOT ? Date.now() - 3600e3 : 0 };
+          }
+          if (msg.type === 'triage:videos') {
+            return { ok: true, videos: videosFor(msg.channelId, msg.offset ?? 0, msg.limit ?? 12) };
+          }
+          if (msg.type === 'triage:progress') {
+            if (msg.save !== undefined) progress = msg.save;
+            return { ok: true, progress };
+          }
+          return { ok: true };
+        },
+      },
+      storage: { local: {
+        get: async () => (benchLang ? { 'ytfeed:lang': benchLang } : {}),
+        set: async () => {}, remove: async () => {},
+      } },
+    };
+
+    // Lets the test simulate a previous session.
+    globalThis.__setProgress = (p) => { progress = p; };
+
+    const { mountTriage } = await import('../src/content/triage.js');
+    await mountTriage();
+
+    // `?shot=drag` stages the gesture rather than the resting card: a still of
+    // a deck of cards says nothing about how it is used, and the whole point of
+    // this screen is that one decision is one movement. The card is put where a
+    // thumb would have carried it, three quarters of the way to keep, and the
+    // two custom properties the real drag sets are set to match, so the green
+    // veil is painted by the production stylesheet and not by this bench.
+    if (SHOT) {
+      const ready = setInterval(() => {
+        const start = [...document.querySelectorAll('.tracktube-triage-primary')]
+          .find((b) => !b.disabled);
+        if (!start) return;
+        clearInterval(ready);
+        start.click();
+        const staged = setInterval(() => {
+          const card = document.querySelector('.tracktube-triage-card');
+          if (!card) return;
+          clearInterval(staged);
+          const ratio = 0.78;
+          card.classList.remove('is-springing');
+          card.style.transform = `translateX(96px) rotate(${(ratio * 4).toFixed(2)}deg)`;
+          card.style.setProperty('--tracktube-drag', String(ratio));
+          card.style.setProperty('--tracktube-drag-abs', String(ratio));
+          document.documentElement.dataset.shot = 'ready';
+        }, 120);
+      }, 120);
+    }
+  </script>
+</body>
+</html>

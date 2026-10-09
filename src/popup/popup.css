@@ -1,0 +1,627 @@
+/**
+ * Popup — one window, several modes.
+ *
+ * The previous version stacked everything on a single screen: eight sections,
+ * some fifteen controls and a paragraph of explanation under each. It was
+ * readable to whoever had written the code, unreadable to everyone else. Here,
+ * each mode shows one primary action only, and everything to do with settings
+ * or diagnostics goes behind the cog.
+ */
+
+:root {
+  --bg: #07070e;
+  --bg-2: #11111c;
+  --border: #25253c;
+  --text: #e9e9f5;
+  --grey: #82829c;
+  /* Two roles, two intensities of the same indigo. The subscriptions badge, the
+     switches, the bars and the large figures shared the solid tint with the
+     primary button: a colour that says "act", "this is on" and "here is a
+     measurement" all at once no longer says anything. Action keeps the solid
+     fill, the accent takes the rest. */
+  --action: #5b4bf5;
+  --accent: #9d8bff;
+  --gold: #ffc04d;
+}
+
+* { box-sizing: border-box; }
+
+/* `hidden` has to win against the `display:` laid elsewhere, otherwise an
+   element hidden from JS stays on screen — that is what showed an empty
+   progress rail under the carousel. */
+[hidden] { display: none !important; }
+
+/* 400 px wide rather than 320: cramped, every settings line broke in two and
+   the three counters became unreadable. Chrome allows up to 800; beyond 400 the
+   window looks adrift, without anything more fitting in it. */
+/* A fixed height, not a floor.
+   With `min-height`, each tab was as tall as its own content: Feed and Triage
+   settled around 485 px, History around 460, and switching tab made the window
+   jump by a good centimetre under the mouse. The three now share one height and
+   a tab with more to say scrolls inside its own panel rather than resizing the
+   window. 500 px leaves room under Chrome's 600 px ceiling. */
+body {
+  width: 400px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  height: 500px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.5 Roboto, system-ui, sans-serif;
+}
+
+/* -------------------------------------------------------------- header --- */
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.header-left { display: flex; align-items: center; gap: 9px; }
+
+/* The subscriptions count, against the title. As a solid pill: it is the
+   header's only figure, and in grey next to the title it read as a
+   typographical aside rather than as data. */
+.count-pill {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.header-right { display: flex; align-items: center; gap: 8px; }
+
+/* The feed's switch. It replaces the decorative dot that preceded the title:
+   same position, same size of landmark, but it now says something and lets
+   itself be clicked. */
+.switch {
+  position: relative;
+  width: 30px;
+  height: 16px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--border);
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--grey);
+  transition: transform .15s, background .15s;
+}
+
+.switch[aria-checked="true"] { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+.switch[aria-checked="true"]::after { transform: translateX(14px); background: var(--accent); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Feed off: the title dims, so that the state reads at a glance even without
+   looking at the switch. */
+.switch[aria-checked="false"] + h1 { color: var(--grey); }
+
+
+
+.icon {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--grey);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.icon:hover { background: var(--bg-2); color: var(--text); }
+
+/* --------------------------------------------------------------- modes --- */
+
+/* `min-height: 0` is what lets the panel scroll: a flex item's floor is the
+   size of its content, so without it the panel refuses to shrink and pushes the
+   tab bar out of the window instead of scrolling.
+   The gap opened from 12 to 16 px: with the height now fixed, History had the
+   most free room and its blocks stayed clumped at the top. */
+.mode {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+.lead { margin: 0; color: var(--text); }
+
+/* Two actions on one line, sharing the width. */
+/* One button per line, and not two side by side: at 400 px wide "Historique
+   détaillé" wrapped onto two lines in half a row, which made the pair look like
+   one big button and one small one. */
+.button-row { display: flex; flex-direction: column; gap: 8px; }
+
+/* The History and Triage tabs both overflowed a 500 px popup: one carries a
+   lead, two counters, two buttons, a line of state, a highlight and a setting,
+   the other a lead, two counters, a button, a hint and four more counters whose
+   captions run onto two lines. Everything is drawn closer on those two and not
+   on the Feed tab, which has room to spare and would only look sparse. */
+#mode-history,
+#mode-triage { gap: 12px; padding-top: 14px; }
+#mode-history .lead,
+#mode-triage .lead { font-size: 12.5px; }
+#mode-history .stat,
+#mode-triage .stat { padding: 8px 6px; }
+#mode-history .stat b,
+#mode-triage .stat b { font-size: 18px; }
+#mode-history .highlight { padding: 10px 12px; }
+#mode-history .mode-settings { padding-top: 10px; }
+
+.stats { display: flex; gap: 8px; }
+
+/* Waiting, and saying so without a sentence. The figures keep their place so
+   nothing shifts when the real ones arrive. */
+.stats.loading b { animation: attente 1.2s ease-in-out infinite; }
+
+@keyframes attente { 0%, 100% { opacity: .8; } 50% { opacity: .25; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .stats.loading b { animation: none; opacity: .45; }
+}
+
+/* Four figures do not fit on a 400 px line: they go into a square, and the
+   block comes down to fill the bottom of the tab. */
+.stats.grid { display: grid; grid-template-columns: 1fr 1fr; }
+.stats.bottom { margin-top: auto; }
+
+.stat {
+  flex: 1;
+  width: auto;
+  padding: 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.stat b { display: block; font-size: 19px; font-weight: 600; }
+.stat span { color: var(--grey); font-size: 11px; }
+
+/* View shortcuts: the same shape as the counters above, made clickable. They
+   carry their own count, otherwise one would open "Upcoming" only to find there
+   is nothing. */
+#feed-ready {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shortcuts { display: flex; gap: 8px; }
+
+.shortcut {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  text-align: center;
+}
+
+.shortcut b { display: block; font-size: 15px; font-weight: 600; }
+.shortcut span { color: var(--grey); font-size: 11px; }
+.shortcut:disabled { opacity: .4; }
+
+/* ------------------------------------------------------------- carousel --- */
+
+/* The bottom of the window was empty. These views serve no decision: they show
+   the volume coming in, and are leafed through. */
+.carousel {
+  margin-top: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  padding: 8px 10px 10px;
+}
+
+.carousel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 0 6px;
+  border: 0;
+}
+
+.carousel h3 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  color: var(--grey);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* The block gained the height the subscriptions count line took up, now gone
+   into the header: it is the window's only element that gains from being
+   large. */
+.carousel-body { min-height: 124px; display: flex; align-items: flex-end; }
+
+/* -- histogram of the last seven days */
+.bars { display: flex; align-items: flex-end; gap: 6px; width: 100%; height: 124px; }
+
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  gap: 3px;
+}
+
+/* The figure and the initial keep their size; the track takes all the rest and
+   serves as the bar's height reference. Without it, the bar was one flex item
+   among others: beyond the room available it was reduced to that room, and
+   seven days at seven videos rendered the same height as at ten. */
+.bar-col b, .bar-col .bar-day { flex: none; font-size: 10px; color: var(--grey); }
+.bar-col b { font-weight: 600; }
+
+.bar-track { flex: 1; position: relative; width: 100%; min-height: 0; }
+
+.bar-col i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--accent);
+}
+
+/* -- channel ranking */
+.rank { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+
+.rank-row {
+  display: grid;
+  grid-template-columns: 1fr 78px 22px;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.rank-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-row i { display: block; height: 6px; min-width: 3px; border-radius: 3px; background: var(--accent); }
+.rank-row b { text-align: right; color: var(--grey); font-size: 11px; font-weight: 600; }
+
+.hint { margin: 0; color: var(--grey); font-size: 11.5px; }
+.hint.centered { text-align: center; }
+.hint.muted { color: #63637a; font-style: italic; }
+
+/* ------------------------------------------------------------- buttons --- */
+
+button, .filebtn {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+button:hover, .filebtn:hover { border-color: #4d4d62; background: #1a1a24; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+/* The extension's own colour, not white: a white button in the middle of a
+   dark panel reads as a text area. */
+button.primary {
+  border-color: transparent;
+  background: var(--action);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.primary:hover { background: #7060ff; }
+
+/* ------------------------------------------------------------ settings --- */
+
+.sheet {
+  position: absolute;
+  inset: 0 0 41px 0; /* leaves the tab bar visible */
+  overflow-y: auto;
+  padding: 0 16px 16px;
+  background: var(--bg);
+  z-index: 5;
+}
+
+
+/* `z-index` is not optional: the switches are `position: relative` to carry
+   their knob, hence positioned like this bar. At automatic `z-index` it is the
+   document order that decides, and they passed over the opaque ground while
+   scrolling. */
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
+
+/* Against the panel's title, and `margin-right: auto` keeps it stuck to it
+   rather than spread out by the header's `space-between`. */
+.sheet-head .version {
+  margin-left: 8px;
+  margin-right: auto;
+  color: var(--grey);
+  font-size: 11px;
+  /* The title is 14 px: with no common line height, the two texts line up on
+     boxes of different heights and the version looks laid too low. */
+  line-height: 1;
+}
+
+.sheet-head h2 { line-height: 1; }
+
+/* A global setting: presented before the sections, and visually detached from
+   them so that it is not taken for a setting of the current mode. */
+.global-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+details {
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 500;
+  list-style: none;
+  padding: 2px 0;
+}
+
+summary::-webkit-details-marker { display: none; }
+summary::before { content: '▸ '; color: var(--grey); }
+details[open] summary::before { content: '▾ '; }
+
+details > *:not(summary) { margin-top: 8px; }
+
+/* A help entry outside the current mode is not shown at all. */
+
+/* A setting belonging to one tab is laid at the bottom of that tab, separated
+   from the content by a rule. `margin-top: auto` pushes it against the column's
+   lower edge: it takes up the free room instead of floating under the primary
+   button as though it depended on it. */
+/* The figure hook at the bottom of the Triage and History tabs.
+   The figure is coloured and oversized: it is the only thing in those two tabs that
+   must be read before being looked for. A button because a click moves to the
+   next figure, with no affordance other than hover — nobody needs to know the
+   list exists for the window to be readable. */
+.highlight {
+  margin-top: auto;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+.highlight:hover { border-color: #4d4d62; background: #1a1a24; }
+
+.highlight b {
+  flex: none;
+  color: var(--accent);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.highlight span { color: var(--grey); font-size: 12px; line-height: 1.35; }
+
+/* The two would fight over `margin-top: auto`: the hook comes back up against
+   the button and leaves the bottom of the tab to the settings. */
+.mode-settings + .highlight,
+.highlight + .mode-settings { margin-top: 0; }
+
+/* With `margin-top: auto` alone, all the free space piled up above the hook
+   and it ended up stuck to the settings' rule. The two automatic margins share
+   it. */
+.highlight:has(+ .mode-settings) { margin-bottom: auto; }
+
+.mode-settings {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Detached from the sticky header and from the entries: it does not open one
+   more entry, it reopens the full welcome. */
+#btn-onboarding { margin: 12px 0; }
+
+#docs p {
+  margin: 0;
+  color: #c3c3d4;
+  font-size: 12.5px;
+}
+
+#docs b { color: var(--text); font-weight: 600; }
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.row span { flex: 1; }
+
+/* One single width for all the panel's lists. Without it, each sized itself on
+   its longest option: "90 %" floated in a frame cut for "50 % of the duration",
+   and two neighbouring lines never had the same box. The options were shortened
+   at the same time — the line's label already carried the sentence — which
+   allows coming down to 104 px. */
+.row select { width: 104px; flex: none; }
+
+select, input[type=text] {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-2);
+  color: var(--text);
+  font: inherit;
+}
+
+/* The system checkbox stood out: it was the window's only control the browser
+   drew itself, with its square, its blue hover and its own size. The same
+   switch as in the header, smaller. */
+input[type=checkbox] {
+  appearance: none;
+  flex: none;
+  position: relative;
+  width: 32px;
+  height: 18px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-2);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+
+input[type=checkbox]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--grey);
+  transition: transform .15s, background .15s;
+}
+
+input[type=checkbox]:hover { border-color: #4d4d62; }
+input[type=checkbox]:checked { border-color: transparent; background: var(--accent); }
+input[type=checkbox]:checked::after { transform: translateX(14px); background: #fff; }
+input[type=checkbox]:disabled { opacity: .5; cursor: default; }
+input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+output { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* A fold within a fold: the fine setting exists, without imposing itself on
+   whoever merely comes to pick a rhythm. */
+/* --------------------------------------------------------------- sundry --- */
+
+.progress { display: flex; align-items: center; gap: 8px; }
+.progress .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.progress .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
+.progress .label { color: var(--grey); font-size: 11px; white-space: nowrap; }
+
+.report {
+  margin: 12px 0 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-2);
+  color: var(--grey);
+  font: 11px/1.5 ui-monospace, Consolas, monospace;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.alarm {
+  margin: 10px 14px 0;
+  padding: 9px 11px;
+  border: 1px solid #7a3550;
+  border-radius: 8px;
+  background: #26141d;
+  color: #ffb4c4;
+  font-size: 11.5px;
+}
+
+/* --------------------------------------------------------------- modes --- */
+
+.tabs {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.tab {
+  flex: 1;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--grey);
+  padding: 11px 4px;
+  font-size: 12px;
+}
+
+.tab:hover { background: var(--bg-2); border: 0; }
+
+.tab.is-active {
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+/* Secondary button of a settings panel: present, but not calling for attention
+   the way a primary action does. */
+button.ghost {
+  background: transparent;
+  color: var(--grey);
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+button.ghost:hover { color: var(--text); }
+
+/* Two opposite buttons on one line: the popup's buttons are full width by
+   default, which would have stacked them as two successive actions when they
+   are the there and back of one setting. */
+.row-actions { display: flex; gap: 8px; }
+.row-actions button { flex: 1; width: auto; }

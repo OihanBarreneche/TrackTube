@@ -1,0 +1,286 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube — lecture de l'état d'abonnement</title>
+<style>
+  body { font: 14px/1.5 system-ui; background: #0f0f0f; color: #f1f1f1; padding: 24px; }
+  li { margin: 4px 0; }
+  .ok::before { content: '✓ '; color: #4ade80; }
+  .ko::before { content: '✗ '; color: #f87171; }
+  .ko { color: #f87171; }
+  code { color: #a5b4fc; }
+  #fixtures { display: none; }
+</style>
+
+<h1>Lecture de l'état d'abonnement</h1>
+<p>
+  Le lecteur du monde MAIN est interrogé exactement comme le fait le content
+  script, sur des gabarits successifs. C'est ce composant qui, en ne visant
+  qu'un seul chemin Polymer, s'abstenait en silence sur le gabarit actuel de
+  YouTube.
+</p>
+<p id="score">…</p>
+<ul id="results"></ul>
+
+<div id="fixtures"></div>
+
+<script src="/src/content/main-world.js"></script>
+<script>
+  const CHANNEL = 'UCaaaaaaaaaaaaaaaaaaaaaa';
+  const fixtures = document.getElementById('fixtures');
+  const results = document.getElementById('results');
+  let pass = 0, fail = 0, counter = 0;
+
+  /** Interroge le monde MAIN comme le fait le content script. */
+  function ask() {
+    const requestId = `probe${++counter}`;
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve({ timeout: true }), 2000);
+      const onMessage = (event) => {
+        const msg = event.data;
+        if (msg?.source !== 'tracktube-main' || msg.payload?.requestId !== requestId) return;
+        clearTimeout(timer);
+        window.removeEventListener('message', onMessage);
+        resolve(msg.payload);
+      };
+      window.addEventListener('message', onMessage);
+      window.postMessage({ source: 'tracktube-iso', type: 'read-subscription', requestId }, location.origin);
+    });
+  }
+
+  function el(tag, { data, attrs } = {}) {
+    const node = document.createElement(tag);
+    if (data !== undefined) node.data = data;
+    for (const [k, v] of Object.entries(attrs ?? {})) node.setAttribute(k, v);
+    return node;
+  }
+
+  function check(label, condition, detail) {
+    const li = document.createElement('li');
+    li.className = condition ? 'ok' : 'ko';
+    li.textContent = condition ? label : `${label} — reçu : ${JSON.stringify(detail)}`;
+    results.append(li);
+    condition ? pass++ : fail++;
+  }
+
+  async function scenario(label, build, expected) {
+    fixtures.replaceChildren();
+    window.ytInitialData = undefined;
+    // The channel id comes from a source common to every template: what is
+    // tested here is the reading of the state, not that of the id.
+    fixtures.append(el('meta', { attrs: { itemprop: 'channelId', content: CHANNEL } }));
+    build();
+    const got = await ask();
+    const ok = got.channelId === CHANNEL
+      && got.subscribed === expected.subscribed
+      && got.source === expected.source;
+    check(label, ok, got);
+  }
+
+  /** A button dressed the way YouTube dresses its own. */
+  function shapedButton(kind) {
+    const button = el('button');
+    button.className = `ytSpecButtonShapeNextHost ytSpecButtonShapeNextMono ytSpecButtonShapeNext${kind}`;
+    return button;
+  }
+
+  /** Un `<button>` sans habillage reconnaissable. */
+  function plainButton() {
+    const button = el('button');
+    button.className = 'quelconque';
+    return button;
+  }
+
+  (async () => {
+    // --- video page: the Polymer data still exists
+    await scenario(
+      'page vidéo : le booléen des données prime',
+      () => {
+        const scope = el('ytd-watch-metadata');
+        scope.append(el('ytd-subscribe-button-renderer', { data: { channelId: CHANNEL, subscribed: true } }));
+        fixtures.append(scope);
+      },
+      { subscribed: true, source: 'data' },
+    );
+
+    await scenario(
+      'page vidéo : pas abonné',
+      () => {
+        const scope = el('ytd-watch-metadata');
+        scope.append(el('ytd-subscribe-button-renderer', { data: { channelId: CHANNEL, subscribed: false } }));
+        fixtures.append(scope);
+      },
+      { subscribed: false, source: 'data' },
+    );
+
+    await scenario(
+      'gabarit récent : l\'état niché dans le modèle de vue est trouvé',
+      () => {
+        const scope = el('ytd-watch-metadata');
+        scope.append(el('yt-subscribe-button-view-model', {
+          data: { subscribeButtonViewModel: { channelId: CHANNEL, subscribed: true } },
+        }));
+        fixtures.append(scope);
+      },
+      { subscribed: true, source: 'data' },
+    );
+
+    // The real data carries plenty of other `subscribed` booleans, buried in the
+    // button's commands. The one closest to the root wins.
+    await scenario(
+      'plusieurs booléens : celui du bouton l\'emporte sur ceux enfouis',
+      () => {
+        const scope = el('ytd-watch-metadata');
+        scope.append(el('yt-subscribe-button-view-model', {
+          data: {
+            subscribed: false,
+            onTap: { innertubeCommand: { modal: { button: { subscribed: true } } } },
+          },
+        }));
+        fixtures.append(scope);
+      },
+      { subscribed: false, source: 'data' },
+    );
+
+    await scenario(
+      'attribut reflété, sans données Polymer',
+      () => {
+        const scope = el('ytd-watch-metadata');
+        scope.append(el('ytd-subscribe-button-renderer', { attrs: { subscribed: '' } }));
+        fixtures.append(scope);
+      },
+      { subscribed: true, source: 'attr' },
+    );
+
+    // --- channel page: no data left, only the dressing tells them apart
+    await scenario(
+      'page de chaîne, abonné : le bouton discret (Tonal)',
+      () => {
+        const scope = el('yt-page-header-view-model');
+        const vm = el('yt-subscribe-button-view-model');
+        vm.append(shapedButton('Tonal'));
+        scope.append(vm);
+        fixtures.append(scope);
+      },
+      { subscribed: true, source: 'style' },
+    );
+
+    await scenario(
+      'page de chaîne, pas abonné : l\'appel à l\'action (Filled)',
+      () => {
+        const scope = el('yt-page-header-view-model');
+        const vm = el('yt-subscribe-button-view-model');
+        vm.append(shapedButton('Filled'));
+        scope.append(vm);
+        fixtures.append(scope);
+      },
+      { subscribed: false, source: 'style' },
+    );
+
+    // The bug that cost three fixes: a channel page contains nine subscribe
+    // buttons belonging to other channels. Reading whichever came first always
+    // returned "not subscribed", whatever the real state.
+    await scenario(
+      'boutons d\'autres chaînes : ils ne doivent jamais l\'emporter',
+      () => {
+        const scope = el('yt-page-header-view-model');
+        const vm = el('yt-subscribe-button-view-model');
+        vm.append(shapedButton('Tonal'));
+        scope.append(vm);
+        fixtures.append(scope);
+        // The page's shelves, rendered after the header as at YouTube.
+        for (let i = 0; i < 9; i++) {
+          fixtures.append(el('ytd-subscribe-button-renderer', {
+            data: { channelId: 'UCzzzzzzzzzzzzzzzzzzzzzz', subscribed: false },
+          }));
+        }
+      },
+      { subscribed: true, source: 'style' },
+    );
+
+    // --- grelot de notifications
+    await scenario(
+      'grelot dans la zone du bouton : preuve d\'abonnement',
+      () => {
+        const scope = el('yt-page-header-view-model');
+        const vm = el('yt-subscribe-button-view-model');
+        vm.append(plainButton());
+        scope.append(vm, el('yt-subscription-notification-toggle-button-view-model'));
+        fixtures.append(scope);
+      },
+      { subscribed: true, source: 'bell' },
+    );
+
+    // Il y a presque toujours un grelot quelque part dans la page — la cloche
+    // de la barre du haut, par exemple. Hors de la zone, il ne prouve rien.
+    await scenario(
+      'grelot ailleurs dans la page : ne prouve rien',
+      () => {
+        const scope = el('yt-page-header-view-model');
+        const vm = el('yt-subscribe-button-view-model');
+        vm.append(plainButton());
+        scope.append(vm);
+        fixtures.append(scope, el('yt-subscription-notification-toggle-button-view-model'));
+      },
+      { subscribed: false, source: 'absence' },
+    );
+
+    // --- absence de signal
+    await scenario(
+      'conteneurs vides : décors d\'un ancien gabarit, jamais des boutons',
+      () => {
+        for (let i = 0; i < 3; i++) fixtures.append(el('div', { attrs: { id: 'subscribe-button' } }));
+      },
+      { subscribed: null, source: null },
+    );
+
+    await scenario(
+      'aucun bouton : abstention franche',
+      () => {},
+      { subscribed: null, source: null },
+    );
+
+    // Outside any known area, we only conclude if there is no ambiguity at all.
+    await scenario(
+      'zone inconnue, bouton unique : on le lit quand même',
+      () => fixtures.append(el('ytd-subscribe-button-renderer', {
+        data: { channelId: CHANNEL, subscribed: true },
+      })),
+      { subscribed: true, source: 'data' },
+    );
+
+    // The recent template reserves `yt-subscribe-button-view-model` for the main
+    // button; the shelves render `ytd-subscribe-button-renderer`. When there is
+    // only one, there is no ambiguity, even outside a known area.
+    await scenario(
+      'zone inconnue : le modèle de vue unique désigne le bouton de la page',
+      () => {
+        const vm = el('yt-subscribe-button-view-model');
+        vm.append(shapedButton('Tonal'));
+        fixtures.append(vm);
+        for (let i = 0; i < 9; i++) {
+          fixtures.append(el('ytd-subscribe-button-renderer', {
+            data: { channelId: 'UCzzzzzzzzzzzzzzzzzzzzzz', subscribed: false },
+          }));
+        }
+      },
+      { subscribed: true, source: 'style' },
+    );
+
+    // Staying silent for want of a recognised area made channel pages mute as
+    // soon as YouTube renamed its header. The document's first button is the
+    // header's, rendered before the content: that is a better default.
+    await scenario(
+      'zone inconnue, plusieurs boutons : le premier du document fait foi',
+      () => {
+        fixtures.append(el('ytd-subscribe-button-renderer', { data: { channelId: CHANNEL, subscribed: true } }));
+        fixtures.append(el('ytd-subscribe-button-renderer', { data: { subscribed: false } }));
+      },
+      { subscribed: true, source: 'data' },
+    );
+
+    document.getElementById('score').textContent = fail
+      ? `${fail} échec(s) sur ${pass + fail}`
+      : `${pass} tests au vert`;
+    document.getElementById('score').className = fail ? 'ko' : 'ok';
+  })();
+</script>

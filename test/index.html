@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — tests</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { background:#0f0f0f; color:#f1f1f1; font:14px/1.6 "Cascadia Mono",Consolas,monospace; padding:24px; }
+    h1 { font-size:16px; margin:0 0 4px; }
+    #summary { margin:12px 0 18px; padding:10px 14px; border-radius:8px; font-weight:600; }
+    .green { background:#12301c; border:1px solid #2f7d4f; color:#8ff0b0; }
+    .red   { background:#3a1c1c; border:1px solid #6b2d2d; color:#ffc9c9; }
+    li { list-style:none; }
+    .pass::before { content:"PASS  "; color:#59d98a; }
+    .fail::before { content:"FAIL  "; color:#ff6b6b; }
+    .fail { color:#ffc9c9; }
+    .extra { color:#888; }
+    ul { padding:0; margin:0; }
+  </style>
+</head>
+<body>
+  <h1>TrackTube — tests de non-régression</h1>
+  <p class="extra">Couche IndexedDB, ordonnanceur, parsing Atom. Aucun réseau.</p>
+  <div id="summary">Exécution…</div>
+  <ul id="results"></ul>
+
+  <script type="module">
+    import { run } from './smoke.js';
+
+    const results = await run();
+    const failed = results.filter((r) => !r.pass);
+
+    const summary = document.getElementById('summary');
+    summary.className = failed.length ? 'red' : 'green';
+    summary.textContent = failed.length
+      ? `${failed.length} échec(s) sur ${results.length} tests`
+      : `${results.length} tests au vert`;
+
+    const ul = document.getElementById('results');
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.className = r.pass ? 'pass' : 'fail';
+      li.textContent = r.name;
+      if (r.extra !== undefined) {
+        const span = document.createElement('span');
+        span.className = 'extra';
+        span.textContent = '  → ' + JSON.stringify(r.extra);
+        li.appendChild(span);
+      }
+      ul.appendChild(li);
+    }
+  </script>
+</body>
+</html>

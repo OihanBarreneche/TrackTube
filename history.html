@@ -1,0 +1,890 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title data-i18n="hist.doctitle">TrackTube, analyse d'historique</title>
+  <link rel="stylesheet" href="src/pages/history.css">
+</head>
+<body>
+  <header>
+    <h1 data-i18n="hist.h1">Analyse de l'historique</h1>
+    <span id="status" class="muted"></span>
+  </header>
+
+  <!-- First screen, before even knowing whether there is a history. Reading
+       fifteen thousand viewings takes a few seconds: without this the page stays
+       entirely empty, and nothing tells "it is computing" from "it is broken".
+       It is visible from the start and it is the script that removes it. -->
+  <section id="startup" class="card startup">
+    <span class="spinner" aria-hidden="true"></span>
+    <div>
+      <b data-i18n="hist.boot">Lecture de ton historique…</b>
+      <p class="muted" data-i18n="hist.boot.p">Quelques secondes sur un historique de plusieurs années.</p>
+    </div>
+  </section>
+
+  <!-- A discreet banner for the recomputations that follow: changing the range
+       or opening a channel starts a full computation, and with no visual marker
+       one thinks one has misclicked. -->
+  <div id="loading" class="loading" role="status" aria-live="polite" hidden>
+    <span class="spinner" aria-hidden="true"></span>
+    <span id="loading-text" data-i18n="hist.boot">Calcul en cours…</span>
+  </div>
+
+  <!-- With no data, a screen of empty statistics teaches nothing: we show the
+       steps to follow and nothing else. -->
+  <section id="home" class="card" hidden>
+    <h2 data-i18n="hist.import.h">Importer ton historique</h2>
+    <!-- Two sources, and only one of the two asks for any effort. Saying it in
+         that order avoids sending someone off into a Takeout export when all
+         they need is to wait a few days for something better. -->
+    <p data-i18n="hist.import.p1">Tu peux activer le relevé local dans l’onglet Historique de la popup. Il est désactivé au départ et mesure le temps réellement regardé.</p>
+    <p data-i18n="hist.import.p2">Pour le passé, importe un export Google Takeout. Les données disponibles dépendent de ce que YouTube a conservé.</p>
+    <!-- The bold fragments are labels of the Takeout interface, which change
+         with the Google account's language: they have their own key.
+
+         Written out step by step, buttons named. The four line version left
+         people looking for a "Multiple formats" control they could not find,
+         because it sits at the very bottom of a panel that has to be scrolled,
+         and said nothing about the two clicks that actually start the export
+         nor about the wait that follows. -->
+    <ol class="steps">
+      <li><a href="https://takeout.google.com/" target="_blank" rel="noreferrer">takeout.google.com</a><span data-i18n="hist.takeout.1">, puis « Tout désélectionner ».</span></li>
+      <li><span data-i18n="hist.takeout.2">Cocher</span> <b data-i18n="hist.takeout.2b">YouTube et YouTube Music</b><span data-i18n="hist.takeout.2c">.</span></li>
+      <li><span data-i18n="hist.takeout.3">Bouton</span> <b data-i18n="hist.takeout.3b">Formats multiples</b><span data-i18n="hist.takeout.3c">, tout en bas du panneau qui se déplie&nbsp;: mettre</span> <b data-i18n="hist.takeout.3d">Historique</b> <span data-i18n="hist.takeout.3e">sur</span> <b>JSON</b><span data-i18n="hist.takeout.3f">.</span></li>
+      <li><span data-i18n="hist.takeout.4">Bouton</span> <b data-i18n="hist.takeout.4b">Toutes les données YouTube sont incluses</b><span data-i18n="hist.takeout.4c">&nbsp;: tout décocher sauf</span> <b data-i18n="hist.takeout.4d">historique</b><span data-i18n="hist.takeout.4e">.</span></li>
+      <li><b data-i18n="hist.takeout.5">Étape suivante</b><span data-i18n="hist.takeout.5b">, puis</span> <b data-i18n="hist.takeout.5c">Créer une exportation</b><span data-i18n="hist.takeout.5d">. Les valeurs proposées conviennent&nbsp;: lien par e mail, une seule fois, .zip, 2 Go.</span></li>
+      <li><span data-i18n="hist.takeout.6">Google prépare l'archive&nbsp;: de quelques dizaines de minutes à plusieurs heures. Rien à laisser ouvert, tu reçois un e mail. Reviens ici par l'icône de l'extension, onglet Historique.</span></li>
+      <li><span data-i18n="hist.takeout.7">Dans l'archive&nbsp;:</span> <code data-i18n="hist.takeout.7b">historique/watch-history.json</code></li>
+    </ol>
+
+    <label for="file-input" class="button primary" data-i18n="hist.import.choose">Choisir watch-history.json</label>
+    <input id="file-input" type="file" accept=".json,application/json" hidden>
+    <p id="import-status" class="muted import-status"></p>
+  </section>
+
+  <!-- ------------------------------------------------------------ results -->
+  <section id="results" hidden>
+
+    <div class="range-bar">
+      <div class="ranges" id="ranges"></div>
+      <div class="custom">
+        <input type="date" id="date-from" data-i18n-label="hist.range.from" aria-label="Début de la plage">
+        <span class="muted">→</span>
+        <input type="date" id="date-to" data-i18n-label="hist.range.to" aria-label="Fin de la plage">
+        <!-- An impossible range was simply ignored: the fields showed one thing
+             and the page showed another. -->
+        <span id="range-error" class="range-error" hidden></span>
+        <!-- The range taken to its finest grain, which is why it sits with the
+             other range controls rather than among the three game screens. It
+             opens a page of its own: sharing this one meant carrying the range
+             bar, the search and the three game cards above a screen that has no
+             use for any of them. -->
+        <a id="btn-day" class="button quiet" href="journal.html" data-i18n="hist.day.open">Historique détaillé</a>
+      </div>
+    </div>
+
+    <!-- The search lives above everything: it is the only way in to a precise
+         channel, and expecting it at the bottom of the page would make no sense.
+         It goes ahead of the three game screens, which pushed it down by a whole
+         row when they are consulted once, not ten times. -->
+    <div class="search">
+      <input id="search" type="search" autocomplete="off"
+             data-i18n-placeholder="hist.search.ph" placeholder="Chercher une chaîne dans ton historique…"
+             data-i18n-label="hist.search.label" aria-label="Chercher une chaîne">
+      <div id="search-results" class="search-results" hidden></div>
+    </div>
+
+    <!-- The three screens that are looked at instead of read. As dull buttons
+         among the date fields, one had to look for them to find them: they now
+         announce what they are, with the room that takes. They stay above the
+         statistics, never unfolded into the page.
+
+         The pictograms are drawn, not emoji: a gamepad and a trophy in solid
+         colours crushed the rest of the page by their level of detail, and their
+         tints spoke to nothing around them. These share the same stroke and take
+         their card's colour. -->
+    <div class="showcases">
+      <button id="btn-retro" class="showcase retro">
+        <svg class="showcase-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3 L13.9 10.1 L21 12 L13.9 13.9 L12 21 L10.1 13.9 L3 12 L10.1 10.1 Z"/>
+        </svg>
+        <span class="showcase-text">
+          <b data-i18n="hist.retro.h">Ta rétrospective</b>
+          <!-- The count of screens is not written here: it has already changed
+               once, and a description that has to be corrected when a screen is
+               added is a description of the code, not of the feature. -->
+          <small data-i18n="hist.retro.p">Ton année de visionnage mise en images, à garder ou à partager</small>
+        </span>
+      </button>
+      <button id="btn-game" class="showcase game">
+        <svg class="showcase-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="2.5" y="5.5" width="8" height="13" rx="2"/>
+          <rect x="13.5" y="5.5" width="8" height="13" rx="2"/>
+        </svg>
+        <span class="showcase-text">
+          <!-- "Mini jeu : laquelle des deux ?" broke over two lines on an
+               ordinary window, the question mark alone on the second. The title
+               of a card has to hold on one line at the width the card is given,
+               and "face à face" says the comparison just as well. -->
+          <b data-i18n="hist.duel.h">Mini jeu&nbsp;: face à face</b>
+          <small data-i18n="hist.duel.p">Devine laquelle de tes chaînes l'emporte, sans te tromper</small>
+        </span>
+      </button>
+      <button id="btn-tournament" class="showcase tournament">
+        <svg class="showcase-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M3 5H8V12H21M3 19H8V12"/>
+        </svg>
+        <span class="showcase-text">
+          <b data-i18n="hist.tour.h">Mini jeu&nbsp;: le tournoi</b>
+          <small data-i18n="hist.tour.p">Des duels à élimination directe, pour ton classement du moment</small>
+        </span>
+      </button>
+    </div>
+
+    <!-- The two views share the range bar and the search: changing the range on
+         a channel's report and coming back to the overview on another range
+         would be confusing. -->
+    <div id="view-global">
+
+    <!-- What the figures are worth is read before the figures. Placed under the
+         averages, the warning came after the total of hours it is precisely
+         there to qualify. -->
+    <details class="caution" id="reliability-details">
+      <summary data-i18n="hist.rel.summary">Durées et temps : mesures et estimations</summary>
+      <div id="reliability"></div>
+    </details>
+
+    <!-- The gauge of durations still to fetch used to sit here. It was removed
+         in August 2026: it could not reach a hundred percent — the long tail of
+         channels seen once, deleted or gone private will never give up its
+         durations — so it sat frozen at eighty odd percent under a sentence
+         promising a fetch still under way. And it announced a problem the page
+         does not have: a video with no duration is counted at its channel's
+         mean, so the total holds without it. What is missing stays stated, with
+         figures, in the block just above. -->
+
+    <!-- Two rows of four, and that order: what the range holds on the first line,
+         how you go through it on the second. Left to flow on its own the row
+         broke into five figures and a lonely sixth, and the reader took the
+         second line for an afterthought. -->
+    <div class="figure-cards" id="figures">
+      <!-- The label is not fixed: depending on the range, this figure is a
+           duration of content opened or a time actually spent. Saying so in the
+           label itself, rather than in a footnote, avoids reading a total while
+           believing it measures something else. -->
+      <div class="figure">
+        <span class="caption" id="e-hours" data-i18n="hist.time.mixed">Temps regardé, complété</span>
+        <b id="s-hours">—</b>
+        <span class="delta" id="d-hours"></span>
+      </div>
+      <div class="figure">
+        <span class="caption" data-i18n="hist.opened">Vidéos ouvertes</span>
+        <b id="s-videos">—</b>
+        <span class="delta" id="d-videos"></span>
+      </div>
+      <div class="figure">
+        <span class="caption" data-i18n="hist.channels">Chaînes</span>
+        <b id="s-channels">—</b>
+        <span class="delta" id="d-channels"></span>
+      </div>
+      <div class="figure">
+        <span class="caption" data-i18n="hist.activedays">Jours actifs</span>
+        <b id="s-days">—</b>
+        <span class="delta" id="d-days"></span>
+      </div>
+      <!-- The label avoids "video watched on average", which read just as well as
+           "share of a channel's videos I have opened". Here it is about a single
+           video, and about the share of its duration watched. -->
+      <div class="figure" id="card-share-watched" hidden>
+        <span class="caption" data-i18n="hist.partvue">Part regardée d'une vidéo</span>
+        <b id="s-share-watched">—</b>
+        <span class="delta" id="d-share-watched"></span>
+      </div>
+      <!-- Hidden as long as nothing was measured, like the one above: a figure
+           that can only be honest on measured openings shows nothing rather
+           than a dash on a history that comes entirely from an export. -->
+      <div class="figure" id="card-dropoff" hidden>
+        <span class="caption" data-i18n="hist.drop">Tu décroches vers</span>
+        <b id="s-dropoff">—</b>
+        <span class="delta" id="d-dropoff"></span>
+      </div>
+      <!-- The headline figure of the delay sits here and its distribution stays
+           in a card of its own further down: the median is the answer, the bars
+           are the detail one goes looking for afterwards. -->
+      <div class="figure" id="card-delay-median" hidden>
+        <span class="caption" data-i18n="hist.delay.median">Délai avant visionnage</span>
+        <b id="s-delay">—</b>
+        <span class="delta" id="d-delay"></span>
+      </div>
+      <div class="figure" id="card-rewatched" hidden>
+        <span class="caption" data-i18n="hist.again.figure">Vidéos revues</span>
+        <b id="s-rewatched">—</b>
+        <span class="delta" id="d-rewatched"></span>
+      </div>
+    </div>
+
+    <!-- The totals of a twelve month range and of a seven day range do not
+         compare; the averages do. -->
+    <div class="card averages">
+      <div class="title-with-choice">
+        <h2 data-i18n="hist.avg.h">En moyenne</h2>
+        <div class="segmented" id="averages-base">
+          <button class="is-active" data-base="perCoveredDay" data-i18n="hist.avg.day">Par jour</button>
+          <button data-base="perActiveDay" data-i18n="hist.avg.activeday">Par jour actif</button>
+          <button data-base="perWeek" data-i18n="hist.avg.week">Par semaine</button>
+        </div>
+      </div>
+      <div class="triplet">
+        <!-- The caption carries the measure, exactly like the total's above.
+             Without it this figure was the only hour count on the page that did
+             not say which of the two definitions of time it used, and it is the
+             one people read: "eleven hours a day" is unbelievable as time spent
+             and unremarkable as length of content opened. -->
+        <div class="figure"><span class="caption" id="m-hours-caption" data-i18n="hist.time">Temps</span><b id="m-hours">—</b></div>
+        <div class="figure"><span class="caption" data-i18n="hist.videos">Vidéos</span><b id="m-videos">—</b></div>
+        <div class="figure"><span class="caption" data-i18n="hist.distinct">Chaînes différentes</span><b id="m-channels">—</b></div>
+      </div>
+      <!-- No caption under the three figures. "Related to the 8 active days of
+           the range" only rewrote the label of the button already selected, and
+           on a seven day range it read as a contradiction: a range can hold
+           eight active days when the eighth is the day still under way. The
+           difference between a day and an active day is read from the buttons
+           themselves. -->
+    </div>
+
+    <section class="card">
+      <div class="title-with-choice">
+        <h2 data-i18n="hist.trend">Évolution</h2>
+        <span id="trend-step" class="muted"></span>
+      </div>
+      <div id="evolution" class="evolution"></div>
+      <p id="streak" class="muted"></p>
+    </section>
+
+    <!-- ------------------------------------------------------------ rhythm -->
+    <section class="card">
+      <h2 data-i18n="hist.rhythm">Rythme</h2>
+      <div class="rhythm" id="rhythm-grid">
+        <div>
+          <h3 data-i18n="hist.byhour">Par heure</h3>
+          <div id="hours" class="bars"></div>
+          <!-- Only shown when the two figures differ, that is to say when part
+               of the history was read off YouTube's own page, which gives a day
+               and no hour. A curve drawn on a subset says which subset. -->
+          <p id="hours-scope" class="muted" hidden></p>
+        </div>
+        <div>
+          <h3 data-i18n="hist.byweekday">Par jour de la semaine</h3>
+          <div id="days" class="bars"></div>
+        </div>
+      </div>
+      <p id="rhythm-summary" class="muted"></p>
+
+      <!-- The sittings live in this card and not in one of their own: how many
+           times a day one sits down is the same question as at what hour, and
+           two cards would have separated a figure from its curve. -->
+      <div class="sessions" id="sessions" hidden>
+        <h3 data-i18n="hist.sess.h">Séances</h3>
+        <div class="figure-cards tight" id="session-figures">
+          <div class="figure">
+            <span class="caption" data-i18n="hist.sess.perday">Séances par jour actif</span>
+            <b id="s-sessions">—</b>
+          </div>
+          <div class="figure">
+            <span class="caption" data-i18n="hist.sess.median">Durée médiane</span>
+            <b id="s-session-median">—</b>
+          </div>
+          <div class="figure">
+            <span class="caption" data-i18n="hist.sess.longest">La plus longue</span>
+            <b id="s-session-longest">—</b>
+            <span class="delta" id="s-session-longest-day"></span>
+          </div>
+        </div>
+        <p id="sessions-scope" class="muted"></p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ delays -->
+    <section class="card" id="card-delays" hidden>
+      <h2 data-i18n="hist.delay.h">Délai entre la sortie et le visionnage</h2>
+      <p class="muted" data-i18n="hist.delay.p">
+        Le temps écoulé entre la mise en ligne d'une vidéo et le moment où tu
+        l'ouvres. C'est ce qui sépare les chaînes que tu suis en direct de
+        celles qui te servent de bibliothèque.
+      </p>
+      <div id="delays" class="bars wide"></div>
+      <p id="delays-scope" class="muted"></p>
+    </section>
+
+    <!-- ---------------------------------------------------------- channels -->
+    <section class="card">
+      <h2 data-i18n="hist.top.h">Chaînes les plus regardées</h2>
+      <!-- Sorted by its columns, like the two video tables, and no longer by a
+           switch of its own beside the title: two controls for one question left
+           one of them lying whenever the other was used. The gauge and the
+           concentration sentence follow the sorted column. -->
+      <table id="top">
+        <thead>
+          <tr>
+            <th></th>
+            <th><button class="sort" data-field="title" data-i18n="hist.channel">Chaîne</button></th>
+            <th class="num"><button class="sort" data-field="count" data-i18n="hist.videos">Vidéos</button></th>
+            <th class="num"><button class="sort" data-field="seconds" data-i18n="hist.time">Temps</button></th>
+            <th class="num col-share-watched">
+              <button class="sort" data-field="watchedShare" data-i18n="hist.top.partvue">Part regardée</button>
+            </th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="top-note" class="muted"></p>
+      <p id="concentration" class="muted"></p>
+    </section>
+
+    <!-- --------------------------------------------------------- rewatches -->
+    <section class="card" id="card-rewatch" hidden>
+      <h2 data-i18n="hist.again.h">Ce que tu revois</h2>
+      <p class="muted" data-i18n="hist.again.p">
+        Les vidéos ouvertes plusieurs fois sur la plage. Ce n'est jamais ce que
+        tu as le plus regardé&nbsp;: le classement par temps répond à une
+        question de volume, celle ci à une question d'attachement.
+      </p>
+      <table id="rewatch">
+        <thead>
+          <tr>
+            <th></th>
+            <th data-i18n="hist.again.video">Vidéo</th>
+            <th class="num" data-i18n="hist.again.times">Fois</th>
+            <th class="num" data-i18n="hist.again.span">Entre la première et la dernière</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="rewatch-scope" class="muted"></p>
+      <!-- Without this, the list reads as capped at ten by mistake. It is a
+           setting, and one the reader can undo video by video. -->
+      <p class="muted" data-i18n="hist.again.cap">
+        Au delà de dix ouvertures, une vidéo est tenue pour un onglet rouvert au
+        démarrage du navigateur et écartée&nbsp;: la liste est dans les réglages,
+        sous «&nbsp;Onglets restés ouverts&nbsp;».
+      </p>
+    </section>
+
+    <section class="card" id="card-streaks">
+      <h2 data-i18n="hist.streak.h">Celles que tu ne rates jamais</h2>
+      <!-- The two hundred videos per channel ceiling used to be spelled out
+           here. It is reachable by almost nobody, and it made a three line
+           paragraph out of a section that is read in a glance; a series that hit
+           it carries a "max" badge whose tooltip says so, which is where the
+           question actually gets asked. -->
+      <p class="muted" data-i18n="hist.streak.p">Nombre de dernières vidéos vues d'affilée.</p>
+      <div id="streaks" class="streaks"></div>
+    </section>
+
+    <!-- ----------------------------------------------------- subscriptions -->
+    <section class="card" id="card-subscriptions">
+      <h2 data-i18n="hist.subs.h">Ce que tu suis, ce que tu regardes</h2>
+      <div class="spread" id="spread"></div>
+      <div class="two-columns">
+        <div>
+          <h3 id="never-title" data-i18n="hist.subs.never">Abonnements jamais regardés sur la plage</h3>
+          <div id="never" class="channel-list"></div>
+        </div>
+        <div>
+          <h3 data-i18n="hist.subs.candidates">Très regardées, sans abonnement</h3>
+          <div id="candidates" class="channel-list"></div>
+        </div>
+      </div>
+      <!-- A mention, not a direct link: the two tools stay separate — the history
+           analysis assumes a Takeout export few people have, the triage works
+           with nothing at all. But knowing the other exists changes what to do
+           with this list.
+
+           Written from the need rather than from the tool: "the subscription
+           triage takes these channels one by one" described a screen to someone
+           who had not yet decided they wanted anything. -->
+      <p class="muted" data-i18n="hist.subs.p">
+        Cette liste est longue&nbsp;? Le tri des abonnements, dans la popup, te
+        les repasse une par une avec leurs dernières vidéos.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ topics -->
+    <section class="card" id="card-topics">
+      <h2 data-i18n="hist.topics.h">Répartition par sujet</h2>
+      <p class="muted" id="topics-coverage"></p>
+      <div id="topics" class="topics"></div>
+    </section>
+
+    <section class="card" id="card-themes">
+      <h2 data-i18n="hist.words.h">Ce qui revient dans les titres</h2>
+      <p class="muted" data-i18n="hist.words.p">
+        Fréquence brute des mots et expressions, sans dictionnaire&nbsp;: c'est
+        ce qui fait remonter les sujets absents de la liste ci-dessus.
+      </p>
+      <div id="themes" class="themes"></div>
+    </section>
+
+    <!-- --------------------------------------------------------- settings -->
+    <details class="card" id="settings-panel">
+      <summary data-i18n="hist.set.h">Réglages et fiabilité des données</summary>
+
+      <!-- The "Durations" block used to sit here, with its state line and its
+           relaunch and suspend buttons. It was taken out in August 2026.
+
+           It offered nothing to decide. The fetch starts on its own once the
+           subscriptions are imported, runs only in an open YouTube tab, and now
+           has an end — a channel that fails three times is given up on and its
+           videos fall back on the channel's mean. What is left to know, that is
+           how many durations are missing and what that costs the totals, is
+           stated with figures in "What these numbers are worth", at the top of
+           the page. -->
+
+      <!-- How the time figures are counted.
+
+           The default mixes the two: a viewing the extension actually measured
+           counts its measured seconds, a viewing it never saw counts the length
+           of its video, and a video is never counted both ways. The alternative
+           is what the page did before September 2026 — show one measure or the
+           other for the whole range depending on how much of it was measured,
+           which changed the unit under the reader without saying so and put an
+           impossible eleven hours a day on screen. -->
+      <section class="block" id="time-model-block">
+        <h3 data-i18n="hist.set.time">Comment le temps est compté</h3>
+        <p class="muted" data-i18n="hist.set.time.p">
+          Par défaut chaque visionnage mesuré par l'extension compte son temps
+          réel, et les autres comptent la durée entière de leur vidéo. L'unité ne
+          change jamais d'une plage à l'autre.
+        </p>
+        <div class="setting-row">
+          <select id="time-model" data-i18n-label="hist.set.time" aria-label="Comment le temps est compté">
+            <option value="mixed" data-i18n="hist.set.time.mixed">Mesure d'abord, durée en secours</option>
+            <option value="auto" data-i18n="hist.set.time.auto">Une seule unité, choisie selon la couverture</option>
+          </select>
+        </div>
+        <div class="setting-row time-threshold" hidden>
+          <label class="muted" for="time-threshold" data-i18n="hist.set.time.thr">Passer au temps réel à partir de</label>
+          <input id="time-threshold" type="number" min="1" max="100" step="1" value="90">
+          <span class="muted">%</span>
+        </div>
+      </section>
+
+      <!-- Importing a Takeout export once there is already a history.
+           The steps at the top of the page are only shown while the history is
+           empty, so someone who asked Google for a fresher export a week later
+           had nowhere to drop it. The import merges: a viewing already held is
+           counted as a duplicate, never twice. -->
+      <section class="block">
+        <h3 data-i18n="hist.set.takeout">Importer un export Takeout</h3>
+        <p class="muted" data-i18n="hist.set.takeout.p">
+          Un nouvel export se dépose par dessus l'ancien&nbsp;: seules les lignes
+          absentes sont ajoutées, le reste est reconnu comme déjà là.
+        </p>
+        <label for="file-input" class="button" data-i18n="hist.import.choose">Choisir watch-history.json</label>
+        <p class="muted import-status"></p>
+      </section>
+
+      <!-- Completing the history from YouTube's own history page.
+
+           Takeout stays first and stays the reference: it dates every viewing
+           to the second. But it does not always go back as far. Measured on one
+           real account on 28 August 2026: the export began on 23 May 2024 with
+           12 764 viewings, while the history page paged back to 24 March 2020
+           and gave 44 349. That gap is too large to leave on the table and too
+           coarse to pass off as the same thing, hence the second paragraph. -->
+      <section class="block" id="scrape-block">
+        <h3 data-i18n="hist.set.scrape">Compléter depuis YouTube</h3>
+        <!-- Filled in and revealed at the end of an import, which is the moment
+             the question actually arises: one has just seen where one's export
+             begins, and nothing on screen says whether YouTube keeps more. The
+             sentence names that date and says plainly that the collection may
+             well add nothing. -->
+        <p class="muted scrape-after-import" hidden></p>
+        <p class="muted" data-i18n="hist.set.scrape.p">
+          Ton export Takeout ne remonte pas forcément aussi loin que la page
+          historique de YouTube. Cette collecte parcourt cette page et ajoute ce
+          qui manque, sans toucher à ce qui est déjà là.
+        </p>
+        <p class="muted" data-i18n="hist.set.scrape.warn">
+          Ces lignes sont moins fiables&nbsp;: YouTube n'y donne que le jour,
+          jamais l'heure. Elles sont datées de midi, elles ne comptent qu'un
+          visionnage par vidéo et par jour, et elles restent en dehors de la
+          courbe par heure. Un export Takeout ultérieur les remplace.
+        </p>
+        <p class="muted" data-i18n="hist.set.scrape.tab">
+          Un onglet YouTube doit rester ouvert pendant l'opération. Compte
+          quelques minutes pour un historique de plusieurs années.
+        </p>
+        <button id="btn-scrape" class="button" data-i18n="hist.set.scrape.go">Récupérer depuis YouTube</button>
+        <!-- Only offered once a run has finished, because it only means
+             something then: it is the way to walk back over what has already
+             been collected, after a Takeout import has changed what is there or
+             when one suspects a run went wrong. -->
+        <button id="btn-scrape-full" class="button quiet" hidden data-i18n="hist.set.scrape.all">Tout recollecter</button>
+        <button id="btn-scrape-stop" class="button" hidden data-i18n="hist.set.scrape.stop">Arrêter</button>
+        <p class="muted scrape-since" hidden></p>
+        <p class="muted scrape-status"></p>
+      </section>
+
+      <section class="block">
+        <h3 data-i18n="hist.set.hidden">Chaînes masquées</h3>
+        <p class="muted" data-i18n="hist.set.hidden.p">
+          Exclues de toutes les statistiques. Utile pour sa propre chaîne, qu'on
+          ouvre pour se relire plutôt que pour la regarder.
+        </p>
+        <div class="added">
+          <input id="bl-input" type="text" data-i18n-placeholder="hist.set.hidden.ph" placeholder="Nom exact de la chaîne, ou UC…" list="bl-suggestions">
+          <datalist id="bl-suggestions"></datalist>
+          <button id="bl-add" class="button" data-i18n="hist.set.hidden.add">Masquer</button>
+        </div>
+        <!-- Hiding matches the exact name: a typo used to be accepted and hid
+             nothing, with nothing on screen to tell it from a channel that just
+             has no viewing on the range. -->
+        <span id="bl-error" class="range-error"></span>
+        <div id="bl-list" class="tokens"></div>
+      </section>
+
+      <section class="block">
+        <h3 data-i18n="hist.set.tabs">Onglets restés ouverts</h3>
+        <p class="muted" data-i18n="hist.set.tabs.p">
+          Un onglet YouTube laissé ouvert se recharge à chaque démarrage du
+          navigateur et produit une vraie entrée d'historique, sans que rien
+          n'ait été regardé. Au delà de dix ouvertures, ces vidéos sont exclues
+          par défaut&nbsp;; décoche celles que tu as vraiment revues.
+        </p>
+        <div id="suspects" class="suspects"></div>
+      </section>
+
+      <section class="block">
+        <h3 data-i18n="hist.set.export">Exporter mon historique</h3>
+        <p class="muted" data-i18n="hist.set.export.p">
+          Un fichier JSON où chaque visionnage a les mêmes champs, qu'il vienne
+          de Takeout ou du relevé de l'extension&nbsp;: identifiant, titre,
+          chaîne, horodatage, durée de la vidéo, temps réellement regardé et
+          part vue. Ce qui n'est pas connu vaut « null » plutôt que de
+          manquer, pour que le format ne change pas selon la provenance.
+        </p>
+        <button id="btn-download" class="button" data-i18n="hist.set.export.go">Télécharger l'historique</button>
+        <span id="export-status" class="muted"></span>
+      </section>
+
+      <!-- The button said "erase the imported history", which was wrong twice
+           over: it clears the whole store, and that store holds the extension's
+           own measurements alongside the Takeout lines. A Takeout export can be
+           imported again, a measured viewing cannot be measured again. -->
+      <section class="block">
+        <h3 data-i18n="hist.set.erase.h">Effacer mon historique</h3>
+        <p class="muted" data-i18n="hist.set.erase.p">
+          Vide tout ce que cette page analyse&nbsp;: les lignes importées depuis
+          Takeout, et les visionnages relevés par l'extension depuis son
+          installation. Les premières se réimportent, les seconds sont perdus.
+        </p>
+        <button id="btn-clear" class="button quiet" data-i18n="hist.set.erase">Effacer mon historique</button>
+      </section>
+    </details>
+    </div><!-- /overview -->
+
+    <!-- ---------------------------------------------------- channel report -->
+    <section id="view-channel" hidden>
+      <button id="back" class="button quiet" data-i18n="hist.ch.back">← Retour à la vue d'ensemble</button>
+
+      <div class="channel-header">
+        <span id="ch-avatar"></span>
+        <div class="header-text">
+          <h2 id="ch-name">—</h2>
+          <p class="muted" id="ch-sub"></p>
+        </div>
+        <button id="ch-compare" class="button quiet" data-i18n="hist.ch.compare">Comparer</button>
+        <a id="ch-link" class="button quiet" target="_blank" rel="noreferrer" data-i18n="hist.ch.open">Ouvrir sur YouTube</a>
+      </div>
+
+      <div class="figure-cards" id="ch-figures">
+        <div class="figure">
+          <span class="caption" data-i18n="hist.estimated">Temps estimé</span>
+          <b id="ch-hours">—</b>
+          <span class="delta" id="ch-share-time"></span>
+        </div>
+        <div class="figure">
+          <span class="caption" data-i18n="hist.opened">Vidéos ouvertes</span>
+          <b id="ch-videos">—</b>
+          <span class="delta" id="ch-distinct"></span>
+        </div>
+        <div class="figure">
+          <span class="caption" data-i18n="hist.activedays">Jours actifs</span>
+          <b id="ch-days">—</b>
+          <span class="delta" id="ch-share-views"></span>
+        </div>
+        <div class="figure">
+          <span class="caption" data-i18n="hist.ch.rank">Rang sur la plage</span>
+          <b id="ch-rank">—</b>
+          <span class="delta" id="ch-rank-of"></span>
+        </div>
+        <div class="figure" id="ch-card-share-watched" hidden>
+          <span class="caption" data-i18n="hist.partvue">Part regardée d'une vidéo</span>
+          <b id="ch-share-watched">—</b>
+          <span class="delta" id="ch-share-watched-of"></span>
+        </div>
+        <div class="figure" id="ch-card-dropoff" hidden>
+          <span class="caption" data-i18n="hist.drop">Tu décroches vers</span>
+          <b id="ch-dropoff">—</b>
+          <span class="delta" id="ch-dropoff-of"></span>
+        </div>
+        <!-- The coverage used to be a bar among the streaks, below the fold of
+             a card whose title promised a relationship rather than a figure. It
+             is one of the two numbers this page is opened for; it belongs with
+             the others. -->
+        <div class="figure" id="ch-card-coverage" hidden>
+          <span class="caption" data-i18n="hist.ch.cov">Vidéos de la chaîne vues</span>
+          <b id="ch-coverage">—</b>
+          <span class="delta" id="ch-coverage-of"></span>
+        </div>
+        <div class="figure" id="ch-card-delay" hidden>
+          <span class="caption" data-i18n="hist.delay.median">Délai avant visionnage</span>
+          <b id="ch-delay">—</b>
+          <span class="delta" id="ch-delay-of"></span>
+        </div>
+      </div>
+
+      <section class="card" id="ch-card-relation">
+        <h2 data-i18n="hist.ch.relation">Ta relation avec cette chaîne</h2>
+        <p id="ch-relation"></p>
+        <div id="ch-track" class="track-rows"></div>
+      </section>
+
+      <!-- Its own card and not a line in the relationship above: asked of one
+           channel the question has a concrete answer per window, and a sentence
+           listing three of them was read by nobody. Empty when the feed index
+           holds nothing of this channel, which is the case for one you are not
+           subscribed to. -->
+      <section class="card" id="ch-card-publishing" hidden>
+        <h2 data-i18n="hist.ch.pub.h">Ce qu'elle publie</h2>
+        <div class="figure-cards tight" id="ch-publishing"></div>
+        <p id="ch-publishing-scope" class="muted"></p>
+      </section>
+
+      <section class="card">
+        <div class="title-with-choice">
+          <h2 data-i18n="hist.trend">Évolution</h2>
+          <span id="ch-trend-step" class="muted"></span>
+        </div>
+        <div id="ch-evolution" class="evolution"></div>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="hist.rhythm">Rythme</h2>
+        <div class="rhythm">
+          <div>
+            <h3 data-i18n="hist.byhour">Par heure</h3>
+            <div id="ch-hours-hist" class="bars"></div>
+          </div>
+          <div>
+            <h3 data-i18n="hist.byweekday">Par jour de la semaine</h3>
+            <div id="ch-days-hist" class="bars"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="ch-card-videos">
+        <div class="title-with-choice">
+          <h2 data-i18n="hist.ch.seen">Vidéos vues sur la plage</h2>
+          <span id="ch-videos-count" class="muted"></span>
+        </div>
+        <!-- Widths fixed here rather than left to the browser: the last three
+             columns have bounded content — a counter, a duration, a date —
+             whereas the title is always too long. Under automatic layout the
+             title was the only one to give way. -->
+        <p id="ch-list-note" class="muted"></p>
+        <table id="ch-list">
+          <colgroup>
+            <col class="col-title">
+            <col class="col-opens">
+            <col class="col-duration">
+            <col class="col-duration col-watched">
+            <col class="col-date">
+          </colgroup>
+          <thead>
+            <tr>
+              <th data-i18n="hist.video">Vidéo</th>
+              <th class="num"><button class="sort" data-field="opens" data-i18n="hist.opens">Ouvertures</button></th>
+              <th class="num"><button class="sort" data-field="seconds" data-i18n="hist.duration">Durée</button></th>
+              <th class="num col-watched">
+                <button class="sort" data-field="watchedSeconds" data-i18n="hist.watched">Regardé</button>
+              </th>
+              <th class="num"><button class="sort" data-field="last" data-i18n="hist.lasttime">Dernière fois</button></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <button id="ch-more" class="button quiet" hidden data-i18n="hist.more">Afficher la suite</button>
+      </section>
+
+      <section class="card" id="ch-card-themes">
+        <h2 data-i18n="hist.ch.words">Ce qui revient dans ses titres</h2>
+        <div id="ch-themes" class="themes"></div>
+      </section>
+    </section>
+
+    <!-- -------------------------------------------------------- comparison -->
+    <!-- A view apart and not two reports side by side: the question asked is not
+         "what are these two channels worth" but "which one wins, and by how
+         much". Each line reads as a tug of war. -->
+    <section id="view-comparison" hidden>
+      <button id="back-from-comparison" class="button quiet" data-i18n="hist.cmp.back">← Retour</button>
+
+      <div class="duel">
+        <div class="dueller" id="duel-a">
+          <span class="duel-avatar"></span>
+          <b class="duel-name">—</b>
+          <span class="muted duel-sub"></span>
+        </div>
+        <span class="duel-vs">vs</span>
+        <div class="dueller right" id="duel-b">
+          <span class="duel-avatar"></span>
+          <b class="duel-name">—</b>
+          <span class="muted duel-sub"></span>
+        </div>
+      </div>
+
+      <section class="card">
+        <h2 data-i18n="hist.cmp.h">Qui l'emporte, et de combien</h2>
+        <div id="duel-rows" class="duel-rows"></div>
+      </section>
+
+      <section class="card">
+        <div class="title-with-choice">
+          <h2 data-i18n="hist.cmp.trend">Évolution comparée</h2>
+          <span id="duel-trend-step" class="muted"></span>
+        </div>
+        <div id="duel-evolution" class="evolution"></div>
+        <div id="duel-key" class="duel-key"></div>
+      </section>
+    </section>
+  </section>
+
+  <!-- Confirming the erasure.
+
+       `window.confirm` was doing the job, and doing it badly: its two buttons
+       are "OK" and "Cancel", so the one that destroys the data does not say what
+       it destroys, and the browser's dialogue is grey and unstyled enough to be
+       clicked through. Here each button names its own action, and the one that
+       keeps the data is the one focus lands on. -->
+  <dialog id="confirm-erase" class="confirm" tabindex="-1">
+    <h2 data-i18n="hist.erase.h">Effacer tout ton historique&nbsp;?</h2>
+    <p data-i18n="hist.erase.p">
+      Les lignes venues de Takeout pourront être réimportées depuis ton fichier.
+      Les visionnages relevés par l'extension, eux, ne se retrouvent pas.
+    </p>
+    <div class="confirm-actions">
+      <button id="erase-cancel" class="button" autofocus data-i18n="hist.erase.keep">Garder mon historique</button>
+      <button id="erase-go" class="button danger" data-i18n="hist.erase.go">Effacer définitivement</button>
+    </div>
+  </dialog>
+
+  <!-- Choosing the opponent. The same directory as the search above, but as a
+       dialogue: one is already on a report, and does not want to leave it to go
+       and find the second channel. -->
+  <dialog id="duel-dialog" tabindex="-1">
+    <div class="dialog-header">
+      <h2 data-i18n="hist.cmp.with">Comparer avec…</h2>
+      <button id="duel-close" class="button quiet" data-i18n="pop.close">Fermer</button>
+    </div>
+    <input id="duel-search" type="search" autocomplete="off"
+           data-i18n-placeholder="hist.cmp.ph" placeholder="Nom de la chaîne à comparer…"
+           data-i18n-label="hist.cmp.label" aria-label="Chaîne à comparer">
+    <div class="dialog-body"><div id="duel-results" class="duel-results"></div></div>
+  </dialog>
+
+  <!-- The videos behind a theme, a topic or a word. As a dialogue rather than a
+       section: one goes there to check a hunch, then comes back where one was —
+       no navigation, no loss of context. -->
+  <dialog id="videos-dialog" tabindex="-1">
+    <div class="dialog-header">
+      <h2 id="videos-title" data-i18n="hist.videos">Vidéos</h2>
+      <button id="videos-close" class="button quiet" data-i18n="pop.close">Fermer</button>
+    </div>
+    <p id="videos-sub" class="muted"></p>
+    <div class="dialog-body">
+      <table id="videos-list">
+        <colgroup>
+          <col class="col-title">
+          <col class="col-channel">
+          <col class="col-opens">
+          <col class="col-date">
+        </colgroup>
+        <thead>
+          <tr>
+            <th><button class="sort" data-field="title" data-i18n="hist.video">Vidéo</button></th>
+            <th><button class="sort" data-field="channelTitle" data-i18n="hist.channel">Chaîne</button></th>
+            <th class="num"><button class="sort" data-field="opens" data-i18n="hist.opens">Ouvertures</button></th>
+            <th class="num"><button class="sort" data-field="last" data-i18n="hist.lasttime">Dernière fois</button></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </dialog>
+
+  <!-- Mini game. Betting on one's own figures before seeing them: the whole page
+       answers questions, this one asks them. -->
+  <dialog id="game-dialog" class="game" tabindex="-1">
+    <div class="dialog-header">
+      <h2 data-i18n="hist.game.h">Laquelle des deux ?</h2>
+      <button id="game-close" class="button quiet" data-i18n="pop.close">Fermer</button>
+    </div>
+
+    <!-- The record first: it is the bar to beat, the streak under way is read
+         against it. Both are aligned left, one under the other. -->
+    <div class="game-counters">
+      <span id="game-record" class="muted"></span>
+      <span id="game-score" class="muted"></span>
+    </div>
+
+    <p id="game-question" class="game-question"></p>
+    <p id="game-note" class="game-note"></p>
+    <div id="game-cards" class="game-cards"></div>
+    <p id="game-verdict" class="game-verdict"></p>
+    <button id="game-again" class="button primary" hidden data-i18n="hist.game.again">Rejouer</button>
+  </dialog>
+
+  <!-- Yearly retrospective. Full screen and with no chrome: it is the page's
+       only screen that is looked at instead of read, and the slightest interface
+       border around it would break the effect — and would end up on the PNG. -->
+  <dialog id="retro-dialog" class="retro" tabindex="-1">
+    <div class="retro-bar">
+      <b data-i18n="hist.retro.bar">Rétrospective</b>
+      <!-- The range is chosen here and not outside: one enters the retrospective
+           to look at it, not to go back and set the page. -->
+      <select id="retro-range" data-i18n-label="hist.retro.period" aria-label="Période de la rétrospective"></select>
+      <span id="retro-position" class="muted"></span>
+      <span class="retro-space"></span>
+      <button id="retro-png" class="button quiet" data-i18n="hist.retro.png">Télécharger en PNG</button>
+      <button id="retro-close" class="button quiet" data-i18n="pop.close">Fermer</button>
+    </div>
+
+    <div class="retro-frame">
+      <button id="retro-prev" class="retro-arrow" data-i18n-label="hist.retro.prev" aria-label="Écran précédent">‹</button>
+      <div id="retro-scene" class="retro-scene"></div>
+      <button id="retro-next" class="retro-arrow" data-i18n-label="hist.retro.next" aria-label="Écran suivant">›</button>
+    </div>
+
+    <div id="retro-dots" class="retro-dots"></div>
+  </dialog>
+
+  <!-- Tournament. The rest of the page says what one has watched; this one asks
+       what one prefers, and the two answers are not the same. The body is
+       rendered entirely by the script: settings, duels and ranking follow one
+       another in the same place. -->
+  <dialog id="tournament-dialog" class="tournament" tabindex="-1">
+    <div class="dialog-header">
+      <h2 data-i18n="hist.tour.title">Le tournoi</h2>
+      <span class="retro-space"></span>
+      <button id="tournament-again" class="button quiet" data-i18n="hist.tour.again">Recommencer</button>
+      <button id="tournament-close" class="button quiet" data-i18n="pop.close">Fermer</button>
+    </div>
+    <div id="tournament-body"></div>
+  </dialog>
+
+  <script type="module" src="src/pages/history.js"></script>
+</body>
+</html>

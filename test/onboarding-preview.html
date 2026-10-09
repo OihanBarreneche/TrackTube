@@ -1,0 +1,142 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube — aperçu de l'accueil</title>
+<style>
+  body {
+    margin: 0;
+    background: #1c1c1c;
+    color: #ddd;
+    font: 13px/1.5 Roboto, system-ui, sans-serif;
+    display: flex;
+    gap: 24px;
+    padding: 24px;
+    align-items: flex-start;
+  }
+  iframe {
+    border: 1px solid #444;
+    border-radius: 10px;
+    width: 900px;
+    height: 780px;
+    background: #0f0f0f;
+  }
+  .notes { max-width: 320px; position: sticky; top: 24px; }
+  h1 { font-size: 15px; margin: 0 0 8px; }
+  p { color: #999; font-size: 12px; }
+  code { color: #f1f1f1; }
+  button { margin: 2px 4px 2px 0; }
+</style>
+
+<div class="notes">
+  <h1>Aperçu de l'accueil</h1>
+  <p>
+    La vraie <code>onboarding.html</code>, avec un faux <code>chrome</code>. Sert
+    à relire les trois étapes sans réinstaller l'extension, ce qui est la seule
+    autre façon de la voir.
+  </p>
+  <p>
+    Le bouton d'import ne parle à personne : le faux <code>chrome</code> fait
+    monter le nombre de chaînes au bout de trois secondes, comme le ferait un
+    onglet YouTube.
+  </p>
+  <p>
+    Les deux derniers boutons écrivent la langue en stockage, comme le fait la
+    popup : la page doit se retraduire sur place, sans rechargement.
+  </p>
+  <button id="vide">Repartir sans abonnements</button>
+  <button id="plein">Repartir avec 412 abonnements</button>
+  <button id="fr">Français</button>
+  <button id="en">English</button>
+  <pre id="log" style="color:#8f8;font-size:11px;white-space:pre-wrap"></pre>
+</div>
+
+<iframe id="page"></iframe>
+
+<script type="module">
+  const log = (t) => { document.getElementById('log').textContent += t + '\n'; };
+
+  let chaines = 0;
+  let importLance = 0;
+
+  /** The last fake `chrome` laid down, so that the language buttons reach it. */
+  let faux = null;
+
+  function faireChrome() {
+    const stockage = {};
+    const ecoutes = [];
+    return {
+      runtime: {
+        id: 'bench',
+        getURL: (p) => '/' + p,
+        getManifest: () => ({ version: '0.38.0' }),
+        async sendMessage(msg) {
+          if (msg.type !== 'feed:stats') return { ok: true };
+          // Three seconds after the request, the import "completes". That is
+          // what a real YouTube tab does, in about a second.
+          if (importLance && Date.now() - importLance > 3000) chaines = 412;
+          return { ok: true, stats: { activeChannels: chaines } };
+        },
+        onMessage: { addListener() {} },
+      },
+      storage: {
+        local: {
+          async get(cle) {
+            if (cle == null) return { ...stockage };
+            if (typeof cle === 'string') return cle in stockage ? { [cle]: stockage[cle] } : {};
+            return Object.fromEntries(Object.keys(cle).map((k) => [k, stockage[k] ?? cle[k]]));
+          },
+          async set(obj) {
+            Object.assign(stockage, obj);
+            log('écrit ' + JSON.stringify(obj));
+            // The real `chrome` warns the open pages; without this, the live
+            // language change would not be testable here.
+            const changes = Object.fromEntries(
+              Object.entries(obj).map(([k, v]) => [k, { newValue: v }]));
+            for (const f of ecoutes) f(changes, 'local');
+          },
+          async remove(cle) { delete stockage[cle]; },
+        },
+        onChanged: { addListener(f) { ecoutes.push(f); } },
+      },
+      tabs: {
+        async query() { return []; },
+        async create({ url, active }) {
+          log(`ouvrirait ${url}${active === false ? ' (arrière plan)' : ''}`);
+          if (String(url).includes('youtube.com')) importLance = Date.now();
+        },
+        async getCurrent() { return { id: 1 }; },
+        async update(id, { url }) { log(`irait sur ${url}`); },
+        async sendMessage() { throw new Error('aucun onglet YouTube'); },
+      },
+    };
+  }
+
+  async function charger() {
+    document.getElementById('log').textContent = '';
+    importLance = 0;
+
+    // A fresh iframe every time: rewriting the same module script into an
+    // already served document does not run it again, and the page stayed inert
+    // on the second load.
+    const ancienne = document.getElementById('page');
+    const iframe = ancienne.cloneNode(false);
+    ancienne.replaceWith(iframe);
+
+    const html = await (await fetch('../welcome.html')).text();
+
+    const doc = iframe.contentDocument;
+    doc.open();
+    doc.write(html.replace('<head>', '<head><base href="../">'));
+    doc.close();
+
+    faux = faireChrome();
+    iframe.contentWindow.chrome = faux;
+    log(`chargée, ${chaines} chaînes en base`);
+  }
+
+  document.getElementById('vide').addEventListener('click', () => { chaines = 0; charger(); });
+  document.getElementById('plein').addEventListener('click', () => { chaines = 412; charger(); });
+  document.getElementById('fr').addEventListener('click', () => faux.storage.local.set({ 'ytfeed:lang': 'fr' }));
+  document.getElementById('en').addEventListener('click', () => faux.storage.local.set({ 'ytfeed:lang': 'en' }));
+
+  await charger();
+</script>

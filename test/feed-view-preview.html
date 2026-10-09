@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — aperçu de la grille</title>
+  <style>
+    /* ------------------------------------------------------------------
+       Mock up of the YouTube shell.
+
+       It is not part of the extension. It is here so that the preview is
+       faithful: the extension replaces ONLY the thumbnail grid, inside the real
+       page. The top banner, the sidebar and all the rest of YouTube are kept
+       and intact.
+
+       Without this mock up, the preview looked like a standalone page and
+       suggested a dedicated one.
+       ------------------------------------------------------------------ */
+    :root {
+      --yt-spec-text-primary: #f1f1f1;
+      --yt-spec-text-secondary: #aaa;
+      --yt-spec-base-background: #0f0f0f;
+      --yt-spec-10-percent-layer: rgba(255,255,255,.1);
+      --yt-spec-badge-chip-background: rgba(255,255,255,.08);
+      --yt-spec-badge-chip-background-hover: rgba(255,255,255,.16);
+      color-scheme: dark;
+    }
+
+    body { margin: 0; background: #0f0f0f; font-family: Roboto, Arial, sans-serif; color: #f1f1f1; }
+
+    .mock { opacity: .55; }
+
+    .mock-masthead {
+      position: sticky; top: 0; z-index: 10;
+      display: flex; align-items: center; gap: 16px;
+      height: 56px; padding: 0 16px;
+      background: #0f0f0f; border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .mock-burger { width: 24px; height: 2px; background: #fff; box-shadow: 0 -7px #fff, 0 7px #fff; }
+    .mock-logo { font-weight: 700; letter-spacing: -1px; font-size: 20px; }
+    .mock-logo b { background: #f00; color: #fff; border-radius: 4px; padding: 0 5px; }
+    .mock-search {
+      flex: 0 1 500px; margin: 0 auto; height: 36px;
+      border: 1px solid #303030; border-radius: 18px;
+      display: flex; align-items: center; padding: 0 14px; color: #888; font-size: 14px;
+    }
+    .mock-avatar { width: 32px; height: 32px; border-radius: 50%; background: #3a6ea5; }
+
+    .mock-layout { display: flex; align-items: flex-start; }
+
+    .mock-guide {
+      position: sticky; top: 56px;
+      flex: none; width: 240px; padding: 12px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .mock-guide i {
+      display: block; height: 34px; border-radius: 8px;
+      background: rgba(255,255,255,.06);
+    }
+    .mock-guide i.on { background: rgba(255,255,255,.14); }
+
+    /* The content container, at YouTube's real width. It is what determines the
+       number of columns in automatic mode. */
+    #content { flex: 1; min-width: 0; max-width: 1284px; padding: 24px; }
+
+    /* YouTube's filter bar: sticky under the banner, and above all laid ABOVE
+       the content. It is the suspect for the ✕ button of the first thumbnail
+       disappearing on hover. */
+    .mock-chips {
+      position: sticky;
+      top: 56px;
+      z-index: 2000;
+      display: flex;
+      gap: 8px;
+      padding: 12px 0;
+      background: #0f0f0f;
+    }
+    .mock-chips i {
+      display: block; width: 72px; height: 32px; border-radius: 8px;
+      background: rgba(255,255,255,.1);
+    }
+
+
+    /* ------------------------------------------------------------------
+       `?thumbs`: the shell as YouTube really draws it.
+
+       Measured on youtube.com, 8 October 2026: masthead 56px, logo block 129px
+       after a 56px hamburger, collapsed guide 72px and expanded guide 240px,
+       background #0f0f0f, primary text #f1f1f1, search field #121212. The
+       default mock above stays dimmed on purpose; this one is only for the
+       screenshots, where a greyed out frame would read as a broken page.
+       ------------------------------------------------------------------ */
+    body.shot .mock { opacity: 1; }
+
+    body.shot .mock-masthead { gap: 0; padding: 0 16px; border-bottom: 0; }
+    body.shot .yt-burger {
+      width: 40px; height: 40px; border-radius: 50%; flex: none;
+      display: grid; place-items: center; margin-right: 16px;
+    }
+    body.shot .yt-burger span {
+      width: 18px; height: 2px; background: #f1f1f1; border-radius: 2px;
+      box-shadow: 0 -6px #f1f1f1, 0 6px #f1f1f1;
+    }
+    body.shot .yt-logo { display: flex; align-items: center; gap: 5px; }
+    body.shot .yt-logo svg { display: block; }
+    body.shot .yt-logo b {
+      font: 700 20px/1 Roboto, Arial, sans-serif; letter-spacing: -1.4px; color: #f1f1f1;
+    }
+    body.shot .yt-logo i {
+      font: 400 10px/1 Roboto, Arial, sans-serif; color: #aaa; font-style: normal;
+      align-self: flex-start; margin-top: 2px;
+    }
+    body.shot .yt-centre { flex: 1; display: flex; justify-content: center; gap: 8px; padding: 0 40px; }
+    body.shot .yt-search { display: flex; width: 100%; max-width: 540px; }
+    body.shot .yt-search span {
+      flex: 1; height: 40px; line-height: 38px; padding: 0 16px; box-sizing: border-box;
+      border: 1px solid #303030; border-right: 0; border-radius: 20px 0 0 20px;
+      background: #121212; color: #888; font-size: 16px;
+    }
+    body.shot .yt-search b {
+      width: 64px; height: 40px; box-sizing: border-box; display: grid; place-items: center;
+      border: 1px solid #303030; border-left: 0; border-radius: 0 20px 20px 0;
+      background: #222;
+    }
+    body.shot .yt-round {
+      width: 40px; height: 40px; border-radius: 50%; background: #181818;
+      display: grid; place-items: center; flex: none;
+    }
+    body.shot .yt-right { display: flex; align-items: center; gap: 8px; }
+    body.shot .yt-create {
+      display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px;
+      border-radius: 18px; background: #272727; color: #f1f1f1;
+      font: 500 14px/1 Roboto, Arial, sans-serif;
+    }
+    body.shot .mock-avatar { width: 32px; height: 32px; }
+
+    body.shot .mock-guide { width: 240px; padding: 12px; gap: 0; }
+    body.shot .yt-nav {
+      display: flex; align-items: center; gap: 24px; height: 40px;
+      padding: 0 12px; border-radius: 10px; color: #f1f1f1;
+      font: 400 14px/1 Roboto, Arial, sans-serif;
+    }
+    body.shot .yt-nav.on { background: rgba(255,255,255,.1); font-weight: 500; }
+    body.shot .yt-nav svg { flex: none; }
+    body.shot .yt-rule { height: 1px; background: #272727; margin: 12px 0; }
+    body.shot .yt-head {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 12px; color: #f1f1f1;
+      font: 500 16px/1 Roboto, Arial, sans-serif;
+    }
+    body.shot .yt-head.on { font-weight: 600; }
+    body.shot .yt-more { color: #f1f1f1; }
+    body.shot .yt-more svg { margin-left: 4px; }
+    body.shot .yt-sub {
+      display: flex; align-items: center; gap: 24px; height: 40px;
+      padding: 0 12px; border-radius: 10px; color: #f1f1f1;
+      font: 400 14px/1 Roboto, Arial, sans-serif;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    body.shot .yt-sub img { width: 24px; height: 24px; border-radius: 50%; flex: none; background: #272727; }
+
+    body.shot .mock-chips { gap: 12px; padding: 0 0 16px; }
+    body.shot .mock-chips i {
+      width: auto; height: 32px; padding: 0 12px; border-radius: 8px;
+      background: rgba(255,255,255,.1); color: #f1f1f1;
+      font: 500 14px/32px Roboto, Arial, sans-serif; white-space: nowrap;
+    }
+    body.shot .mock-chips i.on { background: #f1f1f1; color: #0f0f0f; }
+
+    .banner {
+      background: #1b2a3a; border: 1px solid #2d4a6b; border-radius: 8px;
+      padding: 10px 14px; margin: 0 0 20px; font-size: 13px; line-height: 1.5; color: #cfe3f7;
+    }
+    .banner b { color: #fff; }
+
+    /* Made visible only if the extension fails to neutralise it. */
+    ytd-rich-grid-renderer {
+      display: block; color: #ff6b6b; padding: 40px;
+      text-align: center; border: 1px dashed #6b2d2d; border-radius: 8px;
+    }
+  </style>
+  <link rel="stylesheet" href="../src/content/feed-view.css">
+</head>
+<body>
+  <div class="mock mock-masthead">
+    <span class="mock-burger"></span>
+    <span class="mock-logo">You<b>Tube</b></span>
+    <span class="mock-search">Rechercher</span>
+    <span class="mock-avatar"></span>
+  </div>
+
+  <div class="mock-layout">
+    <nav class="mock mock-guide">
+      <i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </nav>
+
+    <main id="content">
+      <p class="banner">
+        <b>Banc d'essai</b> — données factices, hors extension. Le bandeau et la
+        barre latérale grisés simulent YouTube : ils montrent ce que l'extension
+        <b>ne touche pas</b>. Seule la grille de vignettes ci-dessous est
+        remplacée, à l'intérieur de la page YouTube réelle.
+      </p>
+
+      <div class="mock mock-chips">
+        <i></i><i></i><i></i><i></i>
+      </div>
+
+      <!-- Fake YouTube host: the grid must be found and then neutralised. -->
+      <ytd-browse page-subtype="subscriptions">
+        <ytd-rich-grid-renderer>
+          Ceci est la grille native de YouTube. Si tu la vois, c'est qu'elle n'a
+          pas été neutralisée.
+        </ytd-rich-grid-renderer>
+      </ytd-browse>
+    </main>
+  </div>
+
+  <script type="module">
+    // ---- fixture data ----------------------------------------------------
+    // `?lang=en` renders the bench against the English catalogue. The two sides
+    // are kept at strict parity by a test, but parity is not layout: an English
+    // string is routinely a third longer, and the README and the store listing
+    // are written from this side. Without a parameter the only way to see it was
+    // to change the setting inside the installed extension.
+    const benchLang = new URL(location.href).searchParams.get('lang');
+
+    const CHANNELS = [
+      // Three avatar cases: absent, broken URL, and a valid image.
+      { id: 'UC' + 'a'.repeat(22), title: 'ScienceEtonnante', avatarUrl: '' },
+      // Same origin, so the 404 comes at once and fires `error`. A domain that
+      // does not exist would stay pending DNS resolution.
+      { id: 'UC' + 'b'.repeat(22), title: 'Samuel Etienne', avatarUrl: location.origin + '/test/avatar-inexistant.jpg' },
+      { id: 'UC' + 'c'.repeat(22), title: 'Le Monde',
+        avatarUrl: 'data:image/svg+xml,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="%23c33"/></svg>') },
+    ];
+
+    const TITLES = [
+      'Fusion nucléaire : comment piéger un plasma sans le toucher ?',
+      'Un titre volontairement très long pour vérifier que la coupure à deux lignes fonctionne correctement et ne casse pas la grille',
+      'Court',
+      "L'IA change-t-elle vraiment quelque chose ?",
+      'Rétrospective 2026',
+      'Pourquoi le ciel est bleu',
+    ];
+
+    const VIDEOS = Array.from({ length: 24 }, (_, i) => ({
+      id: String(i).padStart(11, 'v'),
+      channelId: CHANNELS[i % 3].id,
+      channelTitle: CHANNELS[i % 3].title,
+      title: TITLES[i % TITLES.length],
+      publishedAt: Date.now() - i * 5 * 3600e3,
+      thumbUrl: '',
+      views: [0, 942, 12_400, 213_453, 4_750_530][i % 5],
+      durationSec: i % 4 === 0 ? null : [95, 754, 1523, 8130][i % 4],
+      watchProgress: i % 5 === 0 ? 0.42 : 0,
+      hidden: 0,
+      seenNativeAt: i % 3 === 0 ? Date.now() : 0,
+    }));
+
+    // `?thumbs` dresses the bench for a screenshot: local images in place of the
+    // deliberately empty ones, invented names and titles in place of the
+    // pathological ones, and the explanatory banner out of the way. The default
+    // stays bare on purpose — an absent thumbnail, a 404 avatar, a missing
+    // duration, a title that overflows and a video at zero views are the cases
+    // this bench exists to show, and none of them belongs in a screenshot.
+    //
+    // Real videos rather than invented ones, from `fixtures/real-feed.json`:
+    // what the public UULF feeds returned on 8 October 2026, plus one public
+    // player record per id for the duration. Nothing is attributed to a channel
+    // that did not publish it. Thumbnails come from `i.ytimg.com` at render
+    // time, so this mode needs the network; the avatar URLs YouTube signs do
+    // expire, and when they do the grid falls back on the channel initial,
+    // exactly as it does in production.
+    //
+    // The one invented thing is the viewer's own state — a video left part
+    // watched — because that is the feature being shown and no feed carries it.
+    if (new URL(location.href).searchParams.has('thumbs')) {
+      const real = await (await fetch('fixtures/real-feed.json')).json();
+      // Avatars from the cache `tools/shoot.py` fills, when it is there: six
+      // probes racing the network paint a different channel as an initial on
+      // every run, and a screenshot tool that does that is not a tool.
+      const cached = await fetch('fixtures/.avatars/index.json')
+        .then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      if (cached) {
+        for (const c of real.channels) {
+          if (cached[c.id]) c.avatarUrl = new URL('fixtures/' + cached[c.id], location.href).href;
+        }
+      }
+
+      CHANNELS.splice(0, CHANNELS.length, ...real.channels);
+      VIDEOS.splice(0, VIDEOS.length, ...real.videos.map((v, i) => ({
+        id: v.id,
+        channelId: v.channelId,
+        channelTitle: v.channelTitle,
+        title: v.title,
+        publishedAt: Date.parse(v.publishedAt),
+        thumbUrl: `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
+        views: v.views,
+        durationSec: v.durationSec,
+        watchProgress: i === 5 ? 0.42 : 0,
+        hidden: 0,
+        seenNativeAt: 0,
+      })));
+      // The shell, drawn at YouTube's real measurements rather than greyed out.
+      document.body.classList.add('shot');
+      const EN = benchLang === 'en';
+      const icon = (d) => `<svg viewBox="0 0 24 24" width="24" height="24" fill="#f1f1f1">`
+        + `<path d="${d}"/></svg>`;
+      const HOME = 'M4 10.5 12 4l8 6.5V20h-6v-5h-4v5H4z';
+      const SHORTS = 'M10 4.5 6 7v10l4 2.5V4.5zm4 0v15l4-2.5V7l-4-2.5z';
+      const SUBS = 'M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z';
+      const YOU = 'M12 4a4 4 0 1 1 0 8 4 4 0 0 1 0-8zm0 10c4.4 0 8 2 8 4v2H4v-2c0-2 3.6-4 8-4z';
+      // Drawn with a stroke rather than a fill: the clock's hands are an inner
+      // subpath, and a single filled path swallows them into a disc.
+      const stroked = (body) => '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"'
+        + ' stroke="#f1f1f1" stroke-width="1.7" stroke-linecap="round">' + body + '</svg>';
+      const CLOCK = stroked('<circle cx="12" cy="12" r="8.4"/><path d="M12 7.2V12l3.4 2"/>');
+      const LIST = 'M4 6h11v2H4zm0 5h11v2H4zm0 5h7v2H4zm13-5 5 3-5 3z';
+      const LATER = CLOCK;
+      const LIKE = 'M3 10h3v10H3zm5 0 4-7a2 2 0 0 1 2 2v5h5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.8 20H8z';
+      const DOWN = 'M12 15.5 6 9h12z';
+
+      document.querySelector('.mock-masthead').innerHTML =
+        `<span class="yt-burger"><span></span></span>`
+        + `<span class="yt-logo">`
+        + `<svg viewBox="0 0 28 20" width="28" height="20">`
+        + `<rect width="28" height="20" rx="5" fill="#f00"/>`
+        + `<path d="M11 5.5 19 10l-8 4.5z" fill="#fff"/></svg>`
+        + `<b>YouTube</b><i>FR</i></span>`
+        + `<span class="yt-centre"><span class="yt-search">`
+        + `<span>${EN ? 'Search' : 'Rechercher'}</span>`
+        + `<b><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#f1f1f1" stroke-width="2">`
+        + `<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 4 4"/></svg></b></span>`
+        + `<span class="yt-round"><svg viewBox="0 0 24 24" width="20" height="20" fill="#f1f1f1">`
+        + `<path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zm7 8a7 7 0 0 1-6 6.9V21h-2v-3.1A7 7 0 0 1 5 11h2a5 5 0 0 0 10 0z"/>`
+        + `</svg></span></span>`
+        + `<span class="yt-right">`
+        + `<span class="yt-create">`
+        + `<svg viewBox="0 0 24 24" width="18" height="18" fill="#f1f1f1"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>`
+        + `${EN ? 'Create' : 'Créer'}</span>`
+        + `<span class="yt-round"><svg viewBox="0 0 24 24" width="22" height="22" fill="#f1f1f1">`
+        + `<path d="M12 3a6 6 0 0 1 6 6v4l2 3v1H4v-1l2-3V9a6 6 0 0 1 6-6zm0 18a2.5 2.5 0 0 1-2.45-2h4.9A2.5 2.5 0 0 1 12 21z"/>`
+        + `</svg></span>`
+        + `<span class="mock-avatar"></span></span>`;
+
+      // The guide of the Subscriptions page: the two top entries, then the
+      // channels under their own heading, then the account section. Copied from
+      // the running extension rather than imagined.
+      const chevron = '<svg viewBox="0 0 24 24" width="16" height="16" fill="#f1f1f1">'
+        + '<path d="M9.5 6 15 12l-5.5 6-1.1-1.2L12.8 12 8.4 7.2z"/></svg>';
+      const MORE = EN ? 'More' : 'Plus';
+      document.querySelector('.mock-guide').innerHTML =
+        `<span class="yt-nav">${icon(HOME)}${EN ? 'Home' : 'Accueil'}</span>`
+        + `<span class="yt-nav">${icon(SHORTS)}Shorts</span>`
+        + `<span class="yt-rule"></span>`
+        + `<span class="yt-head on">${EN ? 'Subscriptions' : 'Abonnements'}${chevron}</span>`
+        + CHANNELS.map((c) => `<span class="yt-sub"><img src="${c.avatarUrl}" alt="">${c.title}</span>`).join('')
+        + `<span class="yt-sub yt-more">${icon(DOWN)}${MORE}</span>`
+        + `<span class="yt-rule"></span>`
+        + `<span class="yt-head">${EN ? 'You' : 'Vous'}${chevron}</span>`
+        + `<span class="yt-nav">${icon(YOU)}${EN ? 'Your channel' : 'Votre chaîne'}</span>`
+        + `<span class="yt-nav">${CLOCK}${EN ? 'History' : 'Historique'}</span>`
+        + `<span class="yt-nav">${icon(LIST)}${EN ? 'Playlists' : 'Playlists'}</span>`
+        + `<span class="yt-nav">${LATER}${EN ? 'Watch later' : 'À regarder plus tard'}</span>`
+        + `<span class="yt-nav">${icon(LIKE)}${EN ? 'Liked videos' : 'Vidéos « J\u2019aime »'}</span>`;
+
+      // There is no row of YouTube filter chips on this page: the extension's
+      // toolbar sits straight under the masthead, which is what the running
+      // extension shows. Inventing one advertised a control that does not exist.
+      document.querySelector('.mock-chips')?.remove();
+
+      document.querySelector('.banner')?.remove();
+    }
+
+    const hidden = new Set();
+    const starred = new Set();
+    const prefs = benchLang ? { 'ytfeed:lang': benchLang } : {};
+
+    const normalize = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+    // ---- stub de l'API extension ----------------------------------------
+    globalThis.chrome = {
+      storage: {
+        local: {
+          async get(k) { return k in prefs ? { [k]: prefs[k] } : {}; },
+          async set(o) {
+            const changes = {};
+            for (const [k, v] of Object.entries(o)) {
+              changes[k] = { oldValue: prefs[k], newValue: v };
+            }
+            Object.assign(prefs, o);
+            for (const fn of chrome.storage.__listeners) fn(changes, 'local');
+          },
+        },
+        // The grid listens for settings changes to redisplay without a reload,
+        // and that is the path the language change takes: the bench therefore
+        // really replays the listeners rather than ignore them.
+        __listeners: [],
+        onChanged: { addListener(fn) { chrome.storage.__listeners.push(fn); } },
+      },
+      runtime: {
+        id: 'bench',
+        // Absolute path from the served root: `../` was resolved relative to
+        // the calling module, hence right for the stylesheet loaded by the page,
+        // and wrong for the dynamic import made from `src/content/`.
+        getURL: (p) => '/' + p,
+        getManifest: () => ({ version: '0.2.0-apercu' }),
+        // The real service worker pushes the progress to the tabs through
+        // chrome.tabs.sendMessage; here we simply replay the listeners.
+        __listeners: [],
+        onMessage: { addListener(fn) { chrome.runtime.__listeners.push(fn); } },
+        __emit(msg) { for (const fn of chrome.runtime.__listeners) fn(msg); },
+        async sendMessage(msg) {
+          if (msg.type === 'subs:list') return { ok: true, channels: CHANNELS };
+
+          if (msg.type === 'feed:page') {
+            const terms = normalize(msg.query).split(/\s+/).filter(Boolean);
+            const visible = VIDEOS.filter((v) => {
+              // "Hidden" is an exclusive mode, like "Priorities".
+              if (msg.onlyHidden ? !hidden.has(v.id) : hidden.has(v.id)) return false;
+              if (msg.onlyStarred && !starred.has(v.id)) return false;
+              if (msg.channelId && v.channelId !== msg.channelId) return false;
+              if (!terms.length) return true;
+              const hay = normalize(`${v.title} ${v.channelTitle}`);
+              return terms.every((t) => hay.includes(t));
+            }).map((v) => ({ ...v, hidden: hidden.has(v.id) ? 1 : 0, starred: starred.has(v.id) ? 1 : 0,
+              shortVerifiedAt: Date.now(), shortValidUntil: Date.now() + 900000 }));
+            const start = msg.after ? visible.findIndex((v) => v.id === msg.after.id) + 1 : 0;
+            const items = visible.slice(start, start + msg.limit);
+            const last = items.at(-1);
+            const more = start + items.length < visible.length;
+            return { ok: true, items, nextCursor: more && last ? { publishedAt: last.publishedAt, id: last.id } : null };
+          }
+
+          if (msg.type === 'feed:counts') {
+            const now = Date.now();
+            const visible = VIDEOS.filter((v) => !hidden.has(v.id));
+            const byPeriod = {};
+            for (const d of msg.periods) {
+              byPeriod[d] = visible.filter((v) => v.publishedAt >= now - d * 86400e3).length;
+            }
+            return { ok: true, counts: { total: visible.length, hidden: hidden.size, byPeriod },
+                     lastSyncAt: Date.now() - 4 * 60_000 };
+          }
+
+          if (msg.type === 'sync:now') {
+            // Simulates a collection that progresses then finds two videos.
+            for (let i = 1; i <= 5; i++) {
+              await new Promise((r) => setTimeout(r, 60));
+              chrome.runtime.__emit({ type: 'sync:progress', done: i, total: 5 });
+            }
+            if (!VIDEOS.some((v) => v.id === 'nouveau0001')) {
+              VIDEOS.unshift(
+                { id: 'nouveau0001', channelId: CHANNELS[0].id, channelTitle: CHANNELS[0].title,
+                  title: 'Vidéo fraîchement collectée', publishedAt: Date.now(), thumbUrl: '',
+                  views: 12, durationSec: 610, watchProgress: 0, hidden: 0, seenNativeAt: 0 },
+                { id: 'nouveau0002', channelId: CHANNELS[2].id, channelTitle: CHANNELS[2].title,
+                  title: 'Une autre toute neuve', publishedAt: Date.now() - 60_000, thumbUrl: '',
+                  views: 3, durationSec: 95, watchProgress: 0, hidden: 0, seenNativeAt: 0 },
+              );
+            }
+            return { ok: true, result: { checked: 5, inserted: 2, total: 5 } };
+          }
+
+          if (msg.type === 'feed:setStarred') {
+            for (const id of msg.ids) {
+              if (msg.starred) { starred.add(id); hidden.delete(id); } else starred.delete(id);
+            }
+            return { ok: true, changed: msg.ids.length };
+          }
+
+          if (msg.type === 'feed:setHidden') {
+            for (const id of msg.ids) msg.hidden ? hidden.add(id) : hidden.delete(id);
+            return { ok: true, changed: msg.ids.length };
+          }
+
+          if (msg.type === 'feed:hideChannel') {
+            const ids = VIDEOS.filter((v) => v.channelId === msg.channelId && !hidden.has(v.id)).map((v) => v.id);
+            for (const id of ids) hidden.add(id);
+            return { ok: true, hiddenIds: ids };
+          }
+
+          return { ok: true };
+        },
+      },
+    };
+
+    const { mountFeedView } = await import('../src/content/feed-view.js');
+    await mountFeedView();
+  </script>
+</body>
+</html>

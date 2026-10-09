@@ -1,0 +1,64 @@
+<!doctype html><meta charset="utf-8">
+<title>TrackTube cache persistant</title>
+<p id="summary">Exécution…</p><ul id="results"></ul>
+<script type="module">
+  import * as db from '../src/lib/db.js';
+  import { UI_SNAPSHOT } from '../src/lib/ui-snapshot.js';
+  const checks=[];
+  const check=(name,ok)=>checks.push({name,ok:!!ok});
+  const memory={}, listeners=[], changed=[];
+  let holdSettings=null;
+  const event={addListener(){}};
+  globalThis.chrome={runtime:{id:'bench',onInstalled:event,onStartup:event,onConnect:event,
+    onMessage:{addListener(f){listeners.push(f);}},sendMessage:async()=>({ok:true}),getURL:p=>'/'+p},
+    alarms:{get:async()=>({periodInMinutes:3}),create:async()=>{},onAlarm:event},
+    tabs:{query:async()=>[],sendMessage:async()=>({ok:true})},
+    storage:{onChanged:{addListener:f=>changed.push(f)},local:{
+      get:async keys=>{
+        if(keys==='ytfeed:settings' && holdSettings){const gate=holdSettings;holdSettings=null;gate.enter();await gate.promise;}
+        return Object.fromEntries((Array.isArray(keys)?keys:[keys]).filter(k=>k in memory).map(k=>[k,memory[k]]));
+      },
+      set:async values=>Object.assign(memory,structuredClone(values)),
+      remove:async keys=>(Array.isArray(keys)?keys:[keys]).forEach(k=>delete memory[k]),
+    }}};
+  const send=(type,args={})=>new Promise((resolve,reject)=>{
+    let claimed=false;
+    for(const listener of listeners) if(listener({type,...args},{},resolve))claimed=true;
+    if(!claimed)reject(new Error('No worker handler: '+type));
+  });
+  const settle=()=>new Promise(r=>setTimeout(r,20));
+  try {
+    await db.putHistory([{key:'cache000001|'+Date.now(),videoId:'cache000001',watchedAt:Date.now(),
+      channelId:'UC'+'a'.repeat(22),channelTitle:'Fixture',title:'Fixture'}]);
+    await import('../src/background/service-worker.js');
+    for(const [type,args] of [['sync:state',{}],['feed:counts',{periods:[1,7,30],withViews:true}],
+      ['feed:pulse',{days:30}],['history:summary',{}],['history:stats',{cacheScope:'365j',topN:15}],['popup:highlights',{}]]) {
+      const answer=await send(type,args);check(type+' returns a successful answer',answer.ok);
+    }
+    await settle();
+    check('All display snapshots persist without a popup',Object.values(UI_SNAPSHOT).every(k=>memory[k]));
+    const oldSummary=memory[UI_SNAPSHOT.history];
+    const imported=await send('history:import',{entries:[{videoId:'cache000002',watchedAt:Date.now(),channelTitle:'Fixture'}]});
+    await settle();
+    check('Ordinary history update really inserts another entry',imported.ok&&(await db.getHistorySummary()).count===2);
+    check('Ordinary history writes retain the last displayed summary',JSON.stringify(oldSummary)===JSON.stringify(memory[UI_SNAPSHOT.history]));
+    await send('history:stats',{topN:100000});await settle();
+    check('Export statistics cannot replace the overview snapshot',memory[UI_SNAPSHOT.stats]?.cacheScope==='365j');
+    let entered, release;
+    const enteredPromise=new Promise(r=>entered=r);
+    holdSettings={enter:entered,promise:new Promise(r=>release=r)};
+    const oldCalculation=send('history:stats',{cacheScope:'before-wipe',topN:15});
+    await enteredPromise;
+    const wiped=await send('history:clear');
+    release();await oldCalculation;await settle();
+    check('Explicit wipe succeeds',wiped.ok);
+    check('Explicit wipe removes summary, analysis and highlights snapshots',
+      [UI_SNAPSHOT.history,UI_SNAPSHOT.stats,UI_SNAPSHOT.highlights].every(k=>!(k in memory)));
+    check('An in-flight calculation cannot recreate wiped snapshots',!(UI_SNAPSHOT.stats in memory));
+    check('History wipe preserves unrelated feed snapshots',!!memory[UI_SNAPSHOT.counts]&&!!memory[UI_SNAPSHOT.pulse]);
+  } catch(e) {check(e.message,false);}
+  for(const c of checks){const li=document.createElement('li');li.className=c.ok?'pass':'fail';li.textContent=c.name;document.querySelector('#results').append(li);}
+  const failed=checks.filter(c=>!c.ok).length;
+  document.querySelector('#summary').textContent=checks.length+' contrôles, '+failed+' échecs';
+  document.querySelector('#summary').className=failed?'red':'green';
+</script>

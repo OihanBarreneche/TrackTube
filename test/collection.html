@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube — collecte par chaîne</title>
+<p id="summary">Exécution…</p><ul id="results"></ul>
+<script type="module">
+  import { run } from './collection.js';
+  try {
+    const results = await run();
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.className = r.pass ? 'pass' : 'fail';
+      li.textContent = r.name + (r.extra ? ' : ' + JSON.stringify(r.extra) : '');
+      document.querySelector('#results').append(li);
+    }
+    const failures = results.filter(r => !r.pass);
+    document.querySelector('#summary').textContent = `${results.length} tests, ${failures.length} échecs`;
+    document.querySelector('#summary').className = failures.length ? 'red' : 'green';
+  } catch (error) {
+    const li = document.createElement('li'); li.className = 'fail'; li.textContent = error.stack;
+    document.querySelector('#results').append(li);
+    document.querySelector('#summary').className = 'red';
+  }
+</script>

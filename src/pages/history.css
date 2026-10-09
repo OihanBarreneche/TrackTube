@@ -1,0 +1,1310 @@
+/**
+ * History analysis page.
+ *
+ * A full page and not the popup: a channel ranking and two histograms do not
+ * fit in 320 pixels without becoming unreadable.
+ */
+
+:root {
+  --bg: #07070e;
+  --card: #11111c;
+  --border: #25253c;
+  --text: #e9e9f5;
+  --grey: #82829c;
+  /* Two intensities of the same indigo. The whole page leaned on a single vivid
+     tint — histograms, curve, ranking, topics, subscription ratio — and read as
+     one block, like an alert dashboard. The solid one keeps what is looked at
+     first and what works; the light one takes the streaks. */
+  --action: #5b4bf5;
+  --accent: #9d8bff;
+  --gold: #ffc04d;
+}
+
+* { box-sizing: border-box; }
+
+/**
+ * The `hidden` attribute must win, always.
+ *
+ * The browser gives it only a default stylesheet `display: none`, which the
+ * slightest class laying a `display` silently overrides. Three elements had
+ * been caught by it — the start screen, the computing banner and the recovery
+ * gauge — all in `display: flex`: the script hid them correctly, they stayed on
+ * screen, and the page looked as though it were computing endlessly. The rule
+ * holds for the whole page, not for them alone.
+ */
+[hidden] { display: none !important; }
+
+body {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 24px 60px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 Roboto, system-ui, sans-serif;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+h1 { margin: 0; font-size: 21px; font-weight: 600; }
+h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+
+.muted { color: var(--grey); font-size: 12.5px; }
+
+a { color: #7fa8ff; }
+
+.card {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  margin-bottom: 16px;
+}
+
+/* ---------------------------------------------------------------- loading -- */
+
+.startup { display: flex; align-items: center; gap: 16px; }
+.startup b { font-size: 15px; }
+.startup p { margin: 2px 0 0; }
+
+/**
+ * Floating banner for recomputations.
+ *
+ * Fixed at the bottom of the window rather than at the top of the page: opening
+ * a channel goes back up, but changing the range does not — an indicator
+ * anchored in the flow would be off screen at the very moment it is needed.
+ */
+.loading {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 6px 22px #0009;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.spinner {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border);
+  border-top-color: var(--action);
+  border-radius: 50%;
+  animation: tourne 0.7s linear infinite;
+}
+
+.startup .spinner { width: 22px; height: 22px; border-width: 3px; }
+
+@keyframes tourne { to { transform: rotate(360deg); } }
+
+/* Perpetual movement is a hindrance to whoever is sensitive to it: the marker
+   stays, the animation stops. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; border-top-color: var(--action); }
+}
+
+/* During a recomputation, the figures on screen are the previous ones: dimming
+   them says they no longer hold, without making them disappear — an empty
+   screen would be more confusing than a stale one. */
+.computing { opacity: 0.45; transition: opacity 0.15s; pointer-events: none; }
+
+/* ------------------------------------------------------------- comparison -- */
+
+/* Two sides one has to tell apart at a glance, without bringing in a colour
+   that exists nowhere else: the vivid against the light is enough to oppose
+   them. */
+:root { --duel-a: var(--action); --duel-b: var(--accent); }
+
+.duel {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.dueller { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dueller.right { flex-direction: row-reverse; text-align: right; }
+.dueller .duel-name { font-size: 18px; }
+.dueller .avatar { width: 48px; height: 48px; font-size: 19px; }
+.duel-vs { color: var(--grey); font-size: 13px; letter-spacing: .1em; }
+
+/* Each line takes two rows: the figures and the measurement's name on top, the
+   shared bar underneath across the full width. */
+.duel-rows { display: flex; flex-direction: column; gap: 14px; }
+
+.duel-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.duel-value { color: var(--grey); font-variant-numeric: tabular-nums; }
+.duel-value.right { text-align: right; }
+.duel-value.won { color: var(--text); font-weight: 600; }
+.duel-label { color: var(--grey); font-size: 12px; }
+
+.duel-track {
+  grid-column: 1 / -1;
+  display: flex;
+  height: 9px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #20202c;
+}
+
+.duel-track i { display: block; height: 100%; }
+.duel-track i.a { background: var(--duel-a); }
+.duel-track i.b { background: var(--duel-b); }
+
+/* Two classes on the selector, not one: `.curve .line` defines the accent
+   colour further down the stylesheet, and at equal specificity it is the last
+   rule that wins — both curves came out the same colour, on top of each
+   other. */
+.curve .line.line-a { stroke: var(--duel-a); }
+.curve .line.line-b { stroke: var(--duel-b); }
+
+/* A curve hidden from the legend stays in the SVG: putting it back costs one
+   click, and the scale does not move between the two states. */
+.curve .line.erased { display: none; }
+.duel-key .key { cursor: pointer; user-select: none; }
+.duel-key .key.muted-out { opacity: .4; text-decoration: line-through; }
+
+.duel-key { display: flex; gap: 16px; margin-top: 10px; font-size: 12.5px; }
+.duel-key .key { padding: 0; border: 0; background: none; color: var(--grey); font: inherit; }
+.duel-key .key::before {
+  content: '';
+  display: inline-block;
+  width: 10px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+.duel-key .key.a::before { background: var(--duel-a); }
+.duel-key .key.b::before { background: var(--duel-b); }
+
+.duel-results { display: flex; flex-direction: column; gap: 2px; }
+.duel-results .result { width: 100%; border: 0; background: none; font: inherit; cursor: pointer; }
+
+/* An impossible range is stated in place, next to the fields carrying it. */
+.range-error { color: #ff6b7d; font-size: 12px; }
+
+/* --------------------------------------------------------------- dialogue -- */
+
+dialog {
+  width: min(860px, 92vw);
+  max-height: 82vh;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--text);
+  font: 14px/1.6 Roboto, system-ui, sans-serif;
+  overflow: hidden;
+}
+
+dialog::backdrop { background: #000c; }
+
+/* `showModal()` gives focus to the first focusable element, that is to the
+   header's "Close" button: it therefore opened ringed, more shown than the
+   two channels to be judged. `autofocus` laid on the dialogue is not enough,
+   Chrome keeps delegating to the button: every opening therefore calls
+   `focus()` on the dialogue, which carries `tabindex="-1"` to be focusable.
+   Here we erase the frame that focus would draw. */
+dialog:focus { outline: none; }
+
+.dialog-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialog-header h2 { margin: 0; }
+
+/* Only the list scrolls: the header and the count stay readable whatever the
+   number of results. */
+.dialog-body { max-height: 62vh; overflow: auto; margin-top: 10px; }
+
+#videos-list { table-layout: fixed; }
+#videos-list .col-channel { width: 190px; }
+#videos-list .col-opens { width: 92px; }
+#videos-list .col-date { width: 116px; }
+#videos-list td { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#videos-list a { text-decoration: none; }
+#videos-list a:hover { text-decoration: underline; }
+
+/* ------------------------------------------------ access to the two screens */
+
+/* `auto-fit` rather than a frozen number of columns: the cards fit on one line
+   when the window is wide, and fold by themselves afterwards, without adding a
+   fourth screen requiring the grid to be touched. */
+.showcases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.showcase {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .12s, box-shadow .12s;
+}
+
+/* Three tints of the same family, and not three unrelated colours: the original
+   blue and gold did stand out from the grey page, but made the three cards
+   strangers to one another when they offer the same thing. The gradient is kept
+   — it is what detaches them from the rest — and only the starting point moves,
+   from carmine to plum. */
+.showcase.retro {
+  background: linear-gradient(115deg, #2a1d7a, #140d3d);
+  border-color: #4436a3;
+  --showcase-tint: #a99cff;
+}
+
+.showcase.game {
+  background: linear-gradient(115deg, #4a1a6e, #1c1040);
+  border-color: #7a3aa8;
+  --showcase-tint: #d3a3f0;
+}
+
+.showcase.tournament {
+  background: linear-gradient(115deg, #14356e, #101a3d);
+  border-color: #2f5aa8;
+  --showcase-tint: #90b6ff;
+}
+
+.showcase:hover { transform: translateY(-2px); box-shadow: 0 8px 22px #0008; }
+
+/* Same template, same stroke width, and the colour comes from the card: the
+   pictograms read as a streaks, not as three separate finds. */
+.showcase-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: var(--showcase-tint, currentColor);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.showcase-text { display: flex; flex-direction: column; gap: 2px; }
+.showcase-text b { font-size: 15px; }
+.showcase-text small { color: #c9c9d9; font-size: 12px; line-height: 1.4; }
+
+@media (max-width: 620px) {
+  .showcases { grid-template-columns: 1fr; }
+}
+
+/* --------------------------------------------------------------- mini game */
+
+dialog.game { width: min(720px, 94vw); text-align: center; }
+
+.game-counters {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+.game-question { font-size: 19px; font-weight: 500; margin: 18px 0 4px; }
+.game-note { font-size: 12px; color: var(--grey); margin: 0 0 12px; min-height: 15px; }
+
+.game-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* `justify-content` as much as `align-items`: the grid stretches both cards to
+   the taller one's height, and without it the card with the short name kept its
+   content stuck at the top, out of step with its neighbour. */
+.game-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 10px;
+  padding: 22px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #1a1a24;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .12s, transform .12s;
+}
+
+/* Choosing one of the two cards is the screen's only gesture: at rest they were
+   no different from a plain frame, and nothing said one could click. */
+.game-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: #20202c;
+  transform: translateY(-2px);
+}
+.game-card:disabled { cursor: default; }
+.game-card.right-answer { border-color: #5ec48d; }
+.game-card.wrong { border-color: #ff6b7d; opacity: .6; }
+
+.game-avatar { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
+
+.game-avatar-initial {
+  display: grid;
+  place-items: center;
+  background: var(--border);
+  font-size: 26px;
+  font-weight: 600;
+}
+
+/* Reserved in advance: with no height, revealing the figure would make both
+   cards jump at the very moment the eye is comparing the borders. */
+.game-value { min-height: 20px; color: var(--grey); }
+
+/* The value's empty counterpart, at the top of the card.
+ *
+ * The value reserves its place even when it is empty: the avatar and the name
+ * therefore centred above thirty pixels of nothing, and ended up too high in the
+ * card. This invisible twin restores the symmetry without setting the figure
+ * adrift. */
+.game-card::before { content: ''; height: 20px; }
+.game-verdict { min-height: 22px; margin: 16px 0 4px; }
+.game-verdict.won { color: #5ec48d; }
+.game-verdict.lost { color: #ff6b7d; }
+
+/* -------------------------------------------------------------- tournament */
+
+/* The box follows its content. A six hundred pixel floor height left the
+   settings screen, which takes five lines, two thirds empty. What that height
+   prevented — the box changing size under the cursor between two votes — is
+   settled where the real subject is: a duel's card. */
+dialog.tournament {
+  width: min(760px, 94vw);
+  max-height: 94vh;
+}
+
+/* `display` under `[open]` only: laid on the bare selector, it would beat the
+   browser's rule that hides closed dialogues, and the tournament would show at
+   the bottom of the page. That is exactly the bug the retrospective had. */
+dialog.tournament[open] { display: flex; flex-direction: column; }
+
+/* The base dialogue is `overflow: hidden`: with no scrolling area inside, a
+   ranking of thirty two channels would be cut short. */
+#tournament-body { flex: 1; min-height: 0; overflow-y: auto; }
+
+.tournament-settings { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+.tournament-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+/* Five sizes and three pools: the row wraps rather than compress the labels
+   into unreadability. */
+.tournament-row .segmented { flex-wrap: wrap; justify-content: flex-end; }
+.tournament-row .segmented { margin-bottom: 0; }
+
+.tournament-round {
+  margin: 18px 0 8px;
+  color: var(--grey);
+  font-size: 13px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.tournament-gauge { height: 3px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.tournament-gauge i { display: block; height: 100%; background: #d0a029; transition: width .2s; }
+
+.tournament-question { margin: 18px 0 14px; font-size: 19px; font-weight: 500; text-align: center; }
+
+.tournament-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* Floor height on the card and not on the window: it is the card that varies
+   from one duel to the next, depending on whether a name fits on one line or
+   two. */
+.tournament-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 190px;
+  text-align: center;
+  gap: 12px;
+  padding: 28px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #1a1a24;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color .12s, transform .12s;
+}
+
+.tournament-card:hover { border-color: #d0a029; transform: translateY(-2px); }
+
+.tournament-avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+.tournament-avatar.large { width: 104px; height: 104px; }
+
+.tournament-avatar-initial {
+  display: grid;
+  place-items: center;
+  background: var(--border);
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.tournament-winner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 0 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tournament-winner b { font-size: 22px; }
+
+.tournament-ranking { width: 100%; margin-top: 14px; border-collapse: collapse; }
+.tournament-ranking th, .tournament-ranking td { padding: 6px 8px; text-align: left; }
+.tournament-ranking th { color: var(--grey); font-weight: 500; font-size: 12px; }
+.tournament-ranking .num { text-align: right; }
+.tournament-ranking tbody tr:nth-child(odd) { background: #ffffff08; }
+.tournament-ranking a { color: var(--text); text-decoration: none; }
+.tournament-ranking a:hover { text-decoration: underline; }
+
+.tournament-note { margin-top: 14px; font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .tournament-row { flex-direction: column; align-items: stretch; }
+}
+
+/* ----------------------------------------------------------- retrospective */
+
+/* The generic dialogue is a card laid on the page; this one takes the screen.
+   The screens are drawn in 1080×1350 portrait so as to be shareable as they
+   are, and it is the available height that commands their size — sizing them on
+   the width would make them overflow at the bottom. */
+/* The `display` only holds with the dialogue open: laid on the bare rule, it
+   would make the closed dialogue shown at the bottom of the page, outside any
+   modal. */
+dialog.retro[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.retro {
+  width: min(1200px, 96vw);
+  max-height: 96vh;
+  height: 96vh;
+  padding: 12px 14px;
+  gap: 10px;
+}
+
+.retro-bar { display: flex; align-items: center; gap: 12px; }
+
+#retro-range {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #1a1a24;
+  color: var(--text);
+  font: inherit;
+}
+.retro-space { flex: 1; }
+
+.retro-frame {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.retro-scene {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.retro-svg {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  border-radius: 16px;
+  box-shadow: 0 10px 40px #0009;
+}
+
+.retro-arrow {
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 34px;
+  line-height: 1;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.retro-arrow:hover:not(:disabled) { background: #ffffff14; }
+.retro-arrow:disabled { opacity: .25; cursor: default; }
+
+.retro-dots { display: flex; justify-content: center; gap: 8px; }
+
+.retro-dots .point {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--border);
+  cursor: pointer;
+}
+
+.retro-dots .point.active { background: var(--accent); }
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.cards .card { margin: 0; }
+
+.figure { text-align: center; }
+.figure b { display: block; font-size: 26px; font-weight: 600; line-height: 1.2; }
+.figure span { color: var(--grey); font-size: 12px; }
+
+ol { margin: 12px 0; padding-left: 20px; color: var(--grey); }
+ol li { margin: 4px 0; }
+code { color: #a5b4fc; }
+
+/* --------------------------------------------------------------- buttons -- */
+
+.button {
+  display: inline-block;
+  padding: 9px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover { border-color: #4d4d62; }
+.button.primary { border-color: transparent; background: var(--text); color: #07070e; font-weight: 600; }
+/* With no frame and no ground: ringed like the others, "Close" was the game
+   dialogue's most shown element, ahead of the two channels to be judged. */
+.button.quiet {
+  padding: 5px 12px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+  color: var(--grey);
+}
+.button.quiet:hover { border-color: transparent; background: #ffffff14; color: var(--text); }
+
+/* The only red left on the page, and it is spent here: an irreversible erasure
+   is the one place where the colour has to contradict the palette. */
+.button.danger { border-color: #7a2f3d; background: #2a1219; color: #ff8f9c; }
+.button.danger:hover { border-color: #ff6b7d; background: #3a1620; color: #ffb3bc; }
+
+/* ------------------------------------------------------------ confirming -- */
+
+dialog.confirm { width: min(460px, 92vw); }
+dialog.confirm h2 { margin: 0 0 8px; font-size: 16px; }
+dialog.confirm p { margin: 0 0 18px; color: var(--grey); font-size: 13px; }
+/* The keeping button first in the source, so focus and the Enter key land on
+   it; the destructive one last, where the eye finishes. */
+.confirm-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* ------------------------------------------------------------- range bar -- */
+
+/* Sticky: the range is the only control that drives the whole page, and one
+   changes it while looking at a section far from the top. */
+.range-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 0;
+  background: var(--bg);
+}
+
+.ranges { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.custom { display: flex; align-items: center; gap: 7px; }
+
+.custom input {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  color-scheme: dark;
+}
+
+.chip {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--grey);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chip:hover { color: var(--text); }
+/* The selection takes the page's colour, not white: elsewhere in the extension
+   an active chip is tinted, and white made it the screen's most contrasted
+   element here. */
+.chip.is-active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------------- search -- */
+
+.search { position: relative; margin-bottom: 16px; }
+
+.search input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+}
+
+.search input:focus { outline: none; border-color: #4d4d62; }
+
+/* Overlaid, not in the flow: the page must not jump at every letter typed. */
+.search-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 6;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #16161f;
+  box-shadow: 0 8px 24px #0009;
+}
+
+.search-results p { margin: 8px 10px; }
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.result:hover { background: #242430; }
+.result-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.result-name small { display: block; color: var(--grey); font-size: 11.5px; }
+
+/* -------------------------------------------------------- channel report -- */
+
+#back { margin-bottom: 14px; }
+
+.channel-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.channel-header .avatar { width: 56px; height: 56px; font-size: 22px; }
+.header-text { flex: 1; min-width: 0; }
+.header-text h2 { margin: 0; font-size: 22px; }
+.header-text p { margin: 2px 0 0; }
+
+/* The two tracking bars reuse the topics grid: same shape, same reading, a bar
+   and its value on the right. */
+.track-rows { display: flex; flex-direction: column; gap: 9px; margin-top: 12px; }
+
+#ch-relation { margin: 0; }
+
+/* Fixed layout: without it the browser shares the width in proportion to each
+   column's longest content, and since video titles are cut by `ellipsis` it
+   treats them as compressible text — the title shrank to a few characters while
+   "Openings" kept its room. */
+#ch-list { table-layout: fixed; }
+#ch-list .col-title { width: auto; }
+#ch-list .col-opens { width: 92px; }
+#ch-list .col-duration { width: 84px; }
+/* "3 min · 45 %": two pieces of information in the same cell, hence wider than
+   the plain duration next to it. Putting them side by side is the whole
+   point. */
+#ch-list .col-watched { width: 112px; }
+#ch-list .col-date { width: 116px; }
+#ch-list td:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Sortable headers stay headers: same colour, same size. The arrow alone
+   signals the active column, without turning the title row into a button
+   bar. */
+.sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sort:hover,
+.sort.active { color: var(--text); }
+.sort::after { content: attr(data-dir); margin-left: 4px; }
+
+#ch-list a { text-decoration: none; }
+#ch-list a:hover { text-decoration: underline; }
+#ch-more { margin-top: 12px; }
+
+/* ------------------------------------------------------------------ table -- */
+
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 7px 8px; text-align: left; border-bottom: 1px solid #20202c; }
+th { color: var(--grey); font-size: 12px; font-weight: 500; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr:last-child td { border-bottom: 0; }
+
+.rank { color: var(--grey); width: 26px; font-variant-numeric: tabular-nums; }
+
+/* -------------------------------------------------------------- histogram -- */
+
+.bars { display: flex; gap: 8px; height: 132px; }
+
+/* The axis shares exactly the height of the bars' body, labels included,
+   otherwise its ticks do not fall against the right heights. */
+.axis-y {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: calc(100% - 14px);
+  color: var(--grey);
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bars-body { flex: 1; display: flex; align-items: flex-end; gap: 3px; height: 100%; }
+
+/* Four or five bars instead of twenty four, spread over the whole width of the
+   card. They were capped at 120px so as not to read as a filled progress bar,
+   and what that gave instead was four bars huddled left with a third of the card
+   empty beside them. The wide gap is what keeps them reading as a distribution. */
+.bars.wide { height: 160px; }
+.bars.wide .bars-body { gap: 20px; }
+.bars.wide .bar span { font-size: 11.5px; }
+
+.bar {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.bar i { display: block; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 2px; }
+
+/* Fixed height even with no text: otherwise the bars whose label is empty go
+   lower than the others and the baseline ripples. */
+.bar span {
+  height: 14px;
+  padding-top: 3px;
+  color: var(--grey);
+  font-size: 9.5px;
+  line-height: 1;
+  text-align: center;
+}
+
+/* The page's tooltip, one for everybody.
+ *
+ * The browser's takes a second to come, ignores the page's styling and clashes
+ * with the rest; this one shows at once. A single box, laid `fixed` at the
+ * document's root: no scrolling frame can clip it, and it serves a table's
+ * cells as well as a chart's SVG shapes, which cannot carry an `::after`. Its
+ * content comes from the hovered element's `data-info` attribute. */
+.tip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  max-width: 300px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #000;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .08s;
+}
+
+.tip.shown { opacity: 1; }
+
+.bar:hover i { background: #b9abff; }
+
+/* ---------------------------------------------------------------- trend -- */
+
+.evolution { height: 150px; }
+.curve { width: 100%; height: 100%; overflow: shown; }
+.curve .line { fill: none; stroke: var(--action); stroke-width: 1.5; }
+.curve .area { fill: var(--action); opacity: .13; stroke: none; }
+.curve .gridlines { stroke: #282834; stroke-width: 1; }
+.curve .axis { fill: var(--grey); font-size: 10px; }
+/* The readings actually measured, when they are few enough to be told apart:
+   the line joining them is a reading convenience, not a measurement. */
+.curve .measured { fill: var(--action); opacity: .55; }
+
+/* The sensitive area is invisible and alone in catching the mouse: otherwise
+   the vertical marker, which crosses the full height, would steal its
+   neighbours' hover. */
+.curve .hover-zone .hit-area { fill: transparent; }
+.curve .hover-zone .crosshair,
+.curve .hover-zone .point { opacity: 0; pointer-events: none; transition: opacity .08s; }
+.curve .hover-zone:hover .crosshair,
+.curve .hover-zone:hover .point { opacity: 1; }
+.curve .crosshair { stroke: #ffffff40; stroke-width: 1; stroke-dasharray: 3 3; }
+.curve .point { fill: var(--action); stroke: var(--bg); stroke-width: 2; }
+
+/* The warning is not decorative: without it, an estimated total of hours would
+   pass for a measurement. */
+/* Light on a page that is otherwise very dark, and that is the point: the block
+   has to be seen before the figures it qualifies. The former amber tones came
+   from the palette before Encre and were the last patch of yellow left on the
+   page. The hue is the indigo of `--action`, opened up until the text can be
+   dark on it. */
+.caution {
+  margin: 0 0 16px;
+  padding: 10px 13px;
+  border-left: 3px solid var(--action);
+  border-radius: 0 8px 8px 0;
+  background: #a99de3;
+  color: #221b52;
+  font-size: 12.5px;
+}
+
+/* One paragraph per approximation: melting them into a single block was what
+   made the warning unreadable. */
+.caution p { margin: 0; }
+.caution summary { cursor: pointer; font-weight: 600; }
+.caution[open] summary { margin-bottom: 10px; }
+.caution p + p { margin-top: 7px; }
+/* Darker than the running text, not lighter: on a light background it is the
+   depth of the ink that makes the emphasis, the opposite of the rest of the
+   page. */
+.caution b { color: #120b38; }
+
+/* --------------------------------------------------------------- figures -- */
+
+/* The column count is set by the script, from how many figures are actually
+   shown: `auto-fit` filled the row and left whatever did not fit alone on the
+   next line, which is how eight figures came out as five and three. The default
+   of four is what an unstyled row falls back to. */
+.figure-cards {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 900px) {
+  .figure-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* The title on top, a breath, then the figure and its comparison grouped at the
+   bottom. All centred: five blocks aligned left gave five columns of text of
+   differing widths, and the free height all fell to the bottom. */
+.figure-cards .figure {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 10px 14px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  text-align: center;
+}
+
+/* Inside a card and not at the head of the page: the three sitting figures are
+   a detail of the rhythm, and at the size of the ones above they would have
+   claimed to be one of the page's headline numbers. */
+.figure-cards.tight { margin-bottom: 8px; }
+.figure-cards.tight .figure { padding: 8px 12px 10px; }
+/* The value right under its caption, and not pushed to the floor of the block
+   the way the headline figures are: only one of the three sitting figures
+   carries a second line, so `margin: auto` opened a hole under the two others'
+   captions. */
+.figure-cards.tight b { font-size: 19px; margin-top: 4px; }
+
+.sessions { margin-top: 18px; }
+.sessions h3 { margin: 0 0 10px; }
+
+/* The channel under the title, in the rewatch table: the same video title can
+   come back from two channels, and the name is what tells them apart. */
+#rewatch td a { color: var(--text); text-decoration: none; }
+#rewatch td a:hover { text-decoration: underline; }
+#rewatch .caption { margin-top: 2px; }
+
+.caption { display: block; color: var(--grey); font-size: 12px; }
+.figure-cards .caption { margin-bottom: 6px; }
+/* `auto` on top: the figure comes down to the bottom of the block, whatever
+   height the tallest neighbour imposes. */
+.figure-cards b { margin: auto 0 0; font-size: 25px; }
+
+/* `block` and a floor height: the line takes its place whether it has anything
+   to say or not. Without this, the card with no comparison lined its value up
+   one line lower than its neighbours'. */
+.delta { display: block; min-height: 15px; font-size: 11.5px; }
+.delta.up { color: #5ec48d; }
+.delta.down { color: #ff6b7d; }
+.delta.flat { color: var(--grey); }
+
+
+/* -------------------------------------------------------------- averages -- */
+
+.averages .triplet {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 12px 0 4px;
+}
+
+.averages .figure { text-align: left; }
+.averages .figure b { font-size: 24px; }
+.averages p { margin: 6px 0 0; }
+
+/* ---------------------------------------------------------------- rhythm -- */
+
+.rhythm { display: grid; grid-template-columns: 2.2fr 1fr; gap: 22px; }
+h3 { margin: 0 0 8px; color: var(--grey); font-size: 12px; font-weight: 500; }
+
+/* The summary is now in separate sentences: a definition, a measurement, a
+   total. Melting them into one paragraph was what made them unreadable. */
+#rhythm-summary p { margin: 8px 0 0; }
+#rhythm-summary p:first-child { margin-top: 14px; color: var(--text); }
+
+/* ------------------------------------------------------- channel ranking -- */
+
+.title-with-choice {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.segmented { display: flex; gap: 4px; margin-bottom: 10px; }
+
+.segmented button {
+  padding: 4px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--grey);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.segmented button.is-active { background: #242430; color: var(--text); }
+
+/* The proportion bar lives in the name's cell: one more column would shrink the
+   name without adding anything. */
+.gauge { height: 2px; margin-top: 4px; border-radius: 2px; background: var(--accent); }
+td.approx { color: var(--grey); }
+
+/* Columns of the live reading: nothing to show as long as no opening has been
+   measured, and a column full of dashes steals the title's room. */
+#top.no-share-watched .col-share-watched { display: none; }
+#ch-list.no-watched .col-watched { display: none; }
+
+.channel-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.channel-name a { text-decoration: none; }
+.channel-name a:hover { text-decoration: underline; }
+
+/* Fixed and non shrinkable size: the fallback badge and the picture take
+   exactly the same room, so the names stay aligned from one line to the next
+   whether the avatar is known or not. */
+.avatar {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2d2d3a;
+  color: var(--grey);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mini-streak {
+  flex: 0 0 auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #2d1f10;
+  color: #f0b070;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+/* --------------------------------------------------------------- streaks -- */
+
+.streaks { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.streak-token {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+.streak-token b { font-variant-numeric: tabular-nums; }
+.streak-token a { color: var(--text); text-decoration: none; }
+.streak-token a:hover { text-decoration: underline; }
+/* The twin `.capped-sample`, which showed the badge inside the section's
+   paragraph, went with that paragraph: the ceiling is explained by the badge's
+   own tooltip, where the question is actually asked. */
+.streak-token .capped {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #2a2350;
+  color: #b3a2ff;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* --------------------------------------------------------- subscriptions -- */
+
+/* A single bar in two parts rather than two figures side by side: the ratio
+   between the two is precisely what one comes to read. */
+.spread {
+  display: flex;
+  height: 30px;
+  margin: 4px 0 18px;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 11.5px;
+  line-height: 30px;
+  white-space: nowrap;
+}
+
+.spread .share {
+  padding: 0 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spread .inside { background: var(--accent); color: #07070e; font-weight: 600; }
+.spread .outside { background: #292936; color: var(--grey); }
+
+.two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+
+.channel-list { display: flex; flex-direction: column; gap: 7px; }
+
+.channel-row { min-width: 0; font-size: 13px; }
+.channel-row a { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.channel-row small { display: block; color: var(--grey); font-size: 11.5px; }
+
+/* ---------------------------------------------------------------- topics -- */
+
+.topics { display: flex; flex-direction: column; gap: 7px; }
+
+/* Fixed width name, elastic track, value on the right: the tracks all start
+   from the same x, otherwise the lengths cannot be compared. */
+.topic {
+  display: grid;
+  grid-template-columns: 170px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.topic .track { height: 9px; border-radius: 5px; background: #20202c; overflow: hidden; }
+.topic .track i { display: block; height: 100%; background: var(--accent); }
+
+.topic .value {
+  color: var(--grey);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- themes -- */
+
+.themes { display: flex; flex-wrap: wrap; gap: 7px; }
+
+/* The chips are buttons since they open the list of videos. They keep the look
+   of labels — it is hover that announces the click. */
+.theme {
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: none;
+  color: var(--grey);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.theme:hover { border-color: var(--grey); background: #ffffff0a; }
+.theme b { color: var(--text); font-weight: 500; }
+.theme.expression { border-color: #45455a; }
+
+/* A topic's name opens its videos too; the bar stays a bar. */
+.topic-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.topic-link:hover { text-decoration: underline; }
+
+/* -------------------------------------------------------------- settings -- */
+
+details summary {
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  list-style: none;
+}
+
+details summary::before { content: '▸ '; color: var(--grey); }
+details[open] summary::before { content: '▾ '; }
+
+.block { margin-top: 20px; padding-top: 16px; border-top: 1px solid #20202c; }
+.block:first-of-type { margin-top: 14px; }
+
+.setting-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+
+.setting-row select,
+.setting-row input {
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #07070e;
+  color: var(--text);
+  font: inherit;
+}
+
+.setting-row input[type="number"] { width: 78px; }
+
+.added { display: flex; gap: 8px; margin: 10px 0; }
+
+.added input {
+  flex: 1;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #07070e;
+  color: var(--text);
+  font: inherit;
+}
+
+.tokens { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.token {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+
+.token button {
+  padding: 0 5px;
+  border: 0;
+  background: transparent;
+  color: var(--grey);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.token button:hover { color: #ff6b7d; }
+
+/* A long list — close to a hundred lines on a three year history — hence
+   bounded in height, otherwise it drowns all the rest of the settings. */
+.suspects { max-height: 340px; overflow-y: auto; margin-top: 10px; }
+
+.suspect {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 2px;
+  border-bottom: 1px solid #1d1d28;
+}
+
+.suspect:last-child { border-bottom: 0; }
+.suspect input { accent-color: var(--accent); }
+.suspect .why { color: var(--grey); font-size: 11.5px; white-space: nowrap; }
+.suspect .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.suspect .name small { display: block; color: var(--grey); font-size: 11px; }
+
+/* ------------------------------------------------------------ narrowness -- */
+
+/* Two columns of statistics in a half shrunk window give tracks a few pixels
+   wide: better to stack. */
+@media (max-width: 720px) {
+  .rhythm,
+  .two-columns { grid-template-columns: 1fr; }
+  .averages .triplet { grid-template-columns: 1fr 1fr; }
+  .topic { grid-template-columns: 120px 1fr auto; }
+}

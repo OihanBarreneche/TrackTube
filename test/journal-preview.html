@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>TrackTube — aperçu de l'historique détaillé</title>
+  <link rel="stylesheet" href="../src/pages/journal.css">
+  <style>
+    .banc {
+      max-width: 860px; margin: 0 auto 18px; padding: 10px 14px;
+      border: 1px dashed #4a4a2a; border-radius: 3px;
+      color: #d8cf9a; font: 12.5px/1.6 Roboto, system-ui, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <p class="banc" id="banc">Banc d'essai — chargement…</p>
+  <div id="hote"></div>
+
+  <script type="module">
+    /**
+     * Preview of the detailed history without the extension.
+     *
+     * The bench got its own page the day the journal did: it used to be a branch
+     * of `history-preview.html`, and that only made sense while the journal was
+     * a view of the analysis page.
+     *
+     * The arithmetic is not simulated — the real `buildDayJournal` runs on a
+     * synthetic day built to hold every case the rows have to render: the three
+     * sources, a measured opening and an unmeasured one, an exact length and a
+     * channel average, a video missing from the feed and one deleted.
+     */
+    import { buildDayJournal } from '../src/lib/history.js';
+
+    const banc = document.getElementById('banc');
+
+    // A single day, deliberately mixed. The hours are spread over the day so the
+    // two charts have something to draw; the noon rows are the collected ones,
+    // which is where the real ones sit too.
+    const jour = new Date();
+    jour.setHours(0, 0, 0, 0);
+    const base = jour.getTime();
+    const heure = 36e5;
+
+    const entries = [];
+    const durations = new Map();
+    const channelMeans = new Map();
+
+    const chaines = [
+      ['UCaaaaaaaaaaaaaaaaaaaaaa', 'Chaîne longue', 2400],
+      ['UCbbbbbbbbbbbbbbbbbbbbbb', 'Chaîne courte', 480],
+      ['UCcccccccccccccccccccccc', 'Chaîne moyenne', 1080],
+    ];
+    for (const [id, , moyenne] of chaines) channelMeans.set(id, moyenne);
+
+    for (let i = 0; i < 22; i++) {
+      const [channelId, channelTitle, moyenne] = chaines[i % 3];
+      const videoId = `v${String(i).padStart(10, '0')}`;
+      const source = i % 5 === 0 ? 'yt' : i % 3 === 0 ? 'takeout' : 'live';
+      // A `yt` row sits at local noon and carries neither hour nor measurement,
+      // exactly as the collection writes it.
+      const watchedAt = source === 'yt' ? base + 12 * heure : base + (7 + (i % 15)) * heure + i * 7e4;
+      // One video in four has no exact length: it falls back on its channel's
+      // average, which the badge has to say.
+      if (i % 4) durations.set(videoId, moyenne + (i % 7) * 60);
+      entries.push({
+        key: `${videoId}|${watchedAt}`,
+        videoId,
+        watchedAt,
+        title: ['Rocket League, le match complet', 'Tuto machine learning', 'Geoguessr, record du monde'][i % 3] + ` ${i}`,
+        channelId: i === 9 ? null : channelId,
+        channelTitle: i === 9 ? '' : channelTitle,
+        nonResolue: i === 9,
+        source,
+        watchedSec: source === 'live' ? 120 + (i % 9) * 210 : null,
+        completed: source === 'live' && i % 6 === 0,
+      });
+    }
+
+    // A handful of rows on the days around, so the two arrows have somewhere to
+    // go and the bench shows them enabled rather than greyed.
+    for (const decalage of [-3, -1, 2]) {
+      entries.push({
+        key: `voisin${decalage}`,
+        videoId: `voisin${decalage}`,
+        watchedAt: base + decalage * 864e5 + 15 * heure,
+        title: `Jour voisin ${decalage}`,
+        channelId: chaines[0][0],
+        channelTitle: chaines[0][1],
+        source: 'live',
+        watchedSec: 600,
+        completed: false,
+      });
+    }
+
+    const stub = {
+      runtime: {
+        // `send` refuses to talk to a `chrome.runtime` without an id: that is how
+        // it recognises a tab orphaned by an extension reload.
+        id: 'banc',
+        getURL: (p) => `../${p}`,
+        async sendMessage(msg) {
+          if (msg.type === 'history:summary') {
+            const to = Math.max(...entries.map((e) => e.watchedAt));
+            return { ok: true, summary: { count: entries.length, from: Math.min(...entries.map((e) => e.watchedAt)), to } };
+          }
+          if (msg.type === 'history:day') {
+            const journal = buildDayJournal(entries, {
+              from: msg.from, to: msg.to, durations, channelMeans,
+            });
+            // The bench has no feed index. One row in three stays out of it,
+            // which is the case worth looking at: it is the one the tags exist
+            // to make readable.
+            journal.entries.forEach((e, i) => {
+              e.feed = i % 3 === 0 ? null : {
+                hidden: i % 7 === 0, watched: i % 2 === 0, watchProgress: (i % 5) / 5,
+                starred: i % 11 === 0, publishedAt: e.watchedAt - 864e5, durationSec: e.durationSec,
+              };
+            });
+            return { ok: true, ...journal };
+          }
+          return { ok: true };
+        },
+      },
+      storage: {
+        local: {
+          _d: {},
+          async get(k) {
+            const cles = Array.isArray(k) ? k : [k];
+            return Object.fromEntries(cles.map((c) => [c, this._d[c]]).filter(([, v]) => v !== undefined));
+          },
+          async set(o) { Object.assign(this._d, o); },
+        },
+        onChanged: { addListener() {} },
+      },
+    };
+    globalThis.chrome = stub;
+
+    // The page wires itself onto ids of the document: it is installed there
+    // before importing its script.
+    const html = await (await fetch('../journal.html')).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    document.getElementById('hote').append(...doc.body.children);
+
+    await import('../src/pages/journal.js');
+
+    banc.textContent = `Banc d'essai — ${entries.length} visionnages synthétiques, `
+      + 'trois sources, une vidéo supprimée, une durée moyenne sur quatre.';
+  </script>
+</body>
+</html>

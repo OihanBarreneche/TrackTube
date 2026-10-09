@@ -1,0 +1,23 @@
+# Line endings are LF, in the repository and in every working tree.
+#
+# This is not a preference. `core.autocrlf` is true on the machine this project
+# is developed on, and the folder here is the extension itself, loaded unpacked
+# from this very path. Without this file the first checkout rewrites all 116
+# files to CRLF in the live code, which shows up as a diff on everything while
+# changing nothing, and the project's own rule is to preserve line endings
+# because a careless rewrite has already corrupted the feed's button glyphs once.
+#
+# Declaring it here settles it for every clone instead of depending on a global
+# setting nobody else has.
+* text=auto eol=lf
+
+# Pictures and archives are never converted. The screenshots in the README and
+# the extension's icons are the ones that would be destroyed by it.
+*.png -text
+*.jpg -text
+*.jpeg -text
+*.zip -text
+*.mp4 -text
+
+# A PowerShell script is read by Windows tooling, which is content with LF, and
+# a mixed rule here would be one more thing to keep in step.

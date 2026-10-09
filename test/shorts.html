@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube : refus des Shorts</title>
+<h1>Refus des Shorts</h1>
+<p id="summary">Exécution…</p>
+<ul id="results"></ul>
+<script type="module">
+  import { run } from './shorts.js';
+  try {
+    const results = await run();
+    const failures = results.filter((r) => !r.pass);
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.className = r.pass ? 'pass' : 'fail';
+      li.textContent = r.name + (r.extra ? ' : ' + JSON.stringify(r.extra) : '');
+      document.querySelector('#results').append(li);
+    }
+    document.querySelector('#summary').textContent = `${results.length} tests, ${failures.length} échecs`;
+    document.querySelector('#summary').className = failures.length ? 'red' : 'green';
+  } catch (err) {
+    document.querySelector('#results').innerHTML = '<li class="fail"></li>';
+    document.querySelector('.fail').textContent = err.stack;
+    document.querySelector('#summary').textContent = 'Échec';
+    document.querySelector('#summary').className = 'red';
+  }
+</script>

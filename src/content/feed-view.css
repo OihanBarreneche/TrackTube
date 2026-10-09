@@ -1,0 +1,1010 @@
+/**
+ * Replacement grid for the subscriptions feed.
+ *
+ * The colours come from YouTube's own CSS variables (`--yt-spec-*`): the grid
+ * therefore follows the user's light or dark theme automatically, with no need
+ * to detect it. The fallback values cover the case where YouTube renames its
+ * variables.
+ */
+
+/* Neutralises the native grid while ours is active. It stays in the DOM:
+   YouTube loads its first batch, which gives us the durations and the playback
+   progress. Since it is never visible, its scroll observer never fires and it
+   loads nothing more.
+
+   The class is laid by the JS on the element it actually found, so that there
+   are never two selectors to keep in step. */
+html.tracktube-active .tracktube-native-grid { display: none !important; }
+
+/* `hidden` is an attribute, not a class: any `display:` rule contradicts it.
+   The JS uses it for the view buttons and the filter badge, so the rule has to
+   win — but bounded to our own subtree, the host page not being ours. */
+#tracktube-root [hidden] { display: none !important; }
+
+#tracktube-root {
+  --tracktube-text: var(--yt-spec-text-primary, #e9e9f5);
+  --tracktube-muted: var(--yt-spec-text-secondary, #9a9ab0);
+  --tracktube-border: var(--yt-spec-10-percent-layer, rgba(255, 255, 255, .1));
+  --tracktube-surface: var(--yt-spec-badge-chip-background, rgba(255, 255, 255, .08));
+  /* The grey veil YouTube lays under its round buttons on hover. */
+  --tracktube-hover-layer: var(--yt-spec-10-percent-layer, rgba(255, 255, 255, .1));
+  /* Three roles, three colours, one warm family. YouTube's blue was taken out:
+     the extension used five accents for three intentions, and one colour there
+     said in turn "act", "this is selected" and "here is a measurement".
+       action  — solid, reserved for what triggers or destroys;
+       accent  — rules and states: active view, selection, focus;
+       gold    — priority, and nothing else.
+     Action and accent are two intensities of the same indigo: what tells them
+     apart to the eye is the solid fill, not the hue. */
+  --tracktube-action: #5b4bf5;
+  --tracktube-accent: #9d8bff;
+  --tracktube-gold: #ffc04d;
+
+  margin: 0 0 24px;
+  font-family: "Roboto", "Arial", sans-serif;
+  color: var(--tracktube-text);
+}
+
+/* ------------------------------------------------------------------ bar ---- */
+
+.tracktube-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 8px 16px;
+}
+
+.tracktube-bar .spacer { flex: 1; }
+
+/* Bar folded away: the statistics row becomes the block's first line and takes
+   over the space the bar used to leave above it. */
+#tracktube-root.tracktube-bare .tracktube-substats { padding-top: 12px; }
+
+.tracktube-chip {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--tracktube-surface);
+  color: var(--tracktube-text);
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tracktube-chip:hover { background: var(--yt-spec-badge-chip-background-hover, rgba(255, 255, 255, .16)); }
+
+.tracktube-chip[aria-pressed="true"] {
+  background: var(--yt-spec-text-primary, #e9e9f5);
+  color: var(--yt-spec-base-background, #07070e);
+}
+
+.tracktube-chip:disabled { opacity: .45; cursor: default; }
+
+.tracktube-chip.is-filter {
+  height: 24px;
+  background: color-mix(in srgb, var(--tracktube-accent) 16%, transparent);
+  color: var(--tracktube-accent);
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* The selection tools only exist in selection mode. */
+.tracktube-selection-tools { display: none; gap: 8px; }
+html.tracktube-selecting .tracktube-selection-tools { display: flex; }
+
+/* In selection mode, only what no longer has an effect disappears: the
+   "Select" button, the search and the column setting. The view buttons stay,
+   because the selection now happens inside the current view: hiding them would
+   hide from the user which set they are working on, and that is precisely what
+   made the bin confusing. */
+html.tracktube-selecting #tracktube-select-toggle,
+html.tracktube-selecting .tracktube-search,
+html.tracktube-selecting #tracktube-columns { display: none; }
+
+/* ----------------------------------------------------------------- search -- */
+
+/* Takes YouTube's search bar's shape — bordered pill, glass on the right — so
+   that it reads as a search field before it is even read. It opens the bar, on
+   the left, where the eye starts. */
+.tracktube-search {
+  display: flex;
+  align-items: center;
+  flex: 0 1 300px;
+  min-width: 160px;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 4px 0 14px;
+  border: 1px solid var(--tracktube-border);
+  border-radius: 16px;
+  background: var(--yt-spec-general-background-a, rgba(0, 0, 0, .1));
+}
+
+.tracktube-search:focus-within { border-color: var(--tracktube-accent); }
+
+.tracktube-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--tracktube-text);
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.tracktube-search-input::placeholder { color: var(--tracktube-muted); }
+.tracktube-search-input:focus { outline: none; }
+
+/* The native clear button of `type="search"` is a grey square that clashes
+   with the pill; we keep ours, which is the glass at rest. */
+.tracktube-search-input::-webkit-search-cancel-button { display: none; }
+
+.tracktube-search-icon {
+  flex: none;
+  width: 24px;
+  text-align: center;
+  color: var(--tracktube-muted);
+  font-size: 17px;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* -------------------------------------------------------------- views ----- */
+
+/* The views form a single joined group, to tell them from the actions that
+   follow: they are tabs, not commands. */
+.tracktube-views {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- columns -- */
+
+/* The setting comes back in plain sight in the bar, after a detour through a ▦
+   icon that opened a menu: folded away, nobody found the setting any more, and
+   the number of columns stopped being visible. It sits on the right, with the
+   tools one rarely uses, and it says what it does. */
+.tracktube-columns {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 32px;
+  gap: 2px;
+  flex: none;
+  border-radius: 8px;
+  background: var(--tracktube-surface);
+  padding: 0 2px;
+}
+
+.tracktube-columns button {
+  border: none;
+  background: none;
+  color: var(--tracktube-text);
+  font-family: inherit;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tracktube-columns button:hover { background: var(--yt-spec-badge-chip-background-hover, rgba(255, 255, 255, .16)); }
+
+.tracktube-columns > button:first-child,
+.tracktube-columns > button:last-child { width: 22px; padding: 0; }
+
+/* At the limit, the sign fades but keeps its place: the figure does not shift.
+   `visibility` rather than `display` for the place, and because an invisible
+   element no longer receives hover — the empty space would otherwise stay lit
+   like a button that no longer exists. */
+.tracktube-columns button.is-at-bound { visibility: hidden; }
+
+/* A figure and two signs: there is nothing else to show, and the "auto" label
+   that used to be added doubled the setting's width. */
+#tracktube-columns-label {
+  width: 20px;
+  padding: 0;
+  font-weight: 500;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* In automatic mode the number is undergone, not chosen: we dim it. */
+#tracktube-columns-label.is-auto { color: var(--tracktube-muted); }
+
+/* ------------------------------------------------------------ statistics -- */
+
+.tracktube-substats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 16px;
+  color: var(--tracktube-muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* Pushed to the right: this is context, not a counter. Same size and same line
+   height as on the left — the two ends otherwise read as two levels of
+   information when they are only one. */
+.tracktube-freshness { margin-left: auto; opacity: .8; }
+
+.tracktube-refresh {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--tracktube-muted);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tracktube-refresh:hover:not(:disabled) { background: var(--tracktube-surface); color: var(--tracktube-text); }
+.tracktube-refresh:disabled { cursor: default; color: var(--tracktube-accent); }
+
+/* The ring shows the collection's real progress, not a decorative animation:
+   it fills at the rate of the channels queried. */
+.tracktube-refresh::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(var(--tracktube-accent) var(--tracktube-progress, 0%), transparent 0);
+  -webkit-mask: radial-gradient(closest-side, transparent 78%, #000 80%);
+  mask: radial-gradient(closest-side, transparent 78%, #000 80%);
+  opacity: 0;
+  transition: opacity .15s;
+}
+
+.tracktube-refresh.is-busy::after { opacity: 1; }
+
+.tracktube-refresh-glyph { display: inline-block; }
+.tracktube-refresh.is-busy .tracktube-refresh-glyph { animation: tracktube-spin 1.6s linear infinite; }
+
+@keyframes tracktube-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tracktube-refresh.is-busy .tracktube-refresh-glyph { animation: none; }
+}
+
+/* ------------------------------------------------------------------ grid --- */
+
+.tracktube-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(326px, 1fr));
+  /* The gutter is carried by the cards' padding rather than by `gap`: that is
+     what lets the hover ground overflow the thumbnail without biting into the
+     neighbouring card. The 8 px on each side restore the original 16 px between
+     two columns, and 20 px of `gap` complete the 20 px of vertical padding to
+     get back the 40 px between two rows. */
+  gap: 20px 0;
+}
+
+/* Number of columns imposed by the user. `minmax(0, 1fr)` and not `1fr`:
+   without it, a thumbnail with a very long title would refuse to compress and
+   would overflow its column. */
+#tracktube-root[data-columns] .tracktube-grid {
+  grid-template-columns: repeat(var(--tracktube-columns), minmax(0, 1fr));
+}
+
+/* Below a 310 px column the layout breaks, so automatic mode falls back to
+   full width. A manual setting, on the other hand, is honoured: it is an
+   explicit choice. */
+@media (max-width: 800px) {
+  #tracktube-root:not([data-columns]) .tracktube-grid { grid-template-columns: 1fr; }
+}
+
+/* Beyond four columns the metadata become unreadable at normal size: we
+   tighten the typography rather than truncate. */
+#tracktube-root[data-columns="5"] .tracktube-title,
+#tracktube-root[data-columns="6"] .tracktube-title,
+#tracktube-root[data-columns="7"] .tracktube-title { font-size: 14px; }
+
+#tracktube-root[data-columns="6"] .tracktube-avatar,
+#tracktube-root[data-columns="7"] .tracktube-avatar { width: 28px; height: 28px; }
+
+#tracktube-root[data-columns="6"] .tracktube-byline,
+#tracktube-root[data-columns="7"] .tracktube-byline,
+#tracktube-root[data-columns="6"] .tracktube-stats,
+#tracktube-root[data-columns="7"] .tracktube-stats { font-size: 12px; }
+
+/* The "views • date" line never wraps: on a narrow card it went to two lines
+   with the middle dot leading, and the heights within one row diverged.
+   Truncating is the lesser evil, the date staying deducible from the rest of
+   the card. */
+.tracktube-stats { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.tracktube-card {
+  position: relative;
+  /* The padding is not decorative: the paint containment `content-visibility`
+     implies cuts everything that overflows the card's box. The hover ground,
+     which must enclose the thumbnail AND the metadata, therefore has to fit
+     inside. That is how YouTube goes about it too. */
+  padding: 8px 8px 12px;
+  /* The browser skips the layout of what is off screen. That is the bulk of a
+     virtualised list's benefit, in one line. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+/* Hover ground, enclosing the thumbnail, the avatar, the title and the
+   metadata — and not the thumbnail alone. This is the gesture that says "this
+   video here" when the eye sweeps a grid of sixty.
+
+   Its tint is drawn from the still itself, computed on first hover and laid as
+   a variable on the card. A neutral colour would serve just as well to point,
+   but not to connect: here the ground visibly belongs to the picture it
+   surrounds. Where no computation is possible, the neutral surface takes over
+   and the effect stays correct. */
+.tracktube-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 16px;
+  background: var(--tracktube-card-tint, var(--tracktube-surface));
+  opacity: 0;
+  transition: opacity .16s ease;
+  pointer-events: none;
+}
+
+.tracktube-card:hover::before,
+.tracktube-card:focus-within::before { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tracktube-card::before { transition: none; }
+}
+
+/* All the content goes above the ground. Without this, the ground painted
+   after the link would cover it. */
+.tracktube-link,
+.tracktube-meta { position: relative; z-index: 1; }
+
+.tracktube-card.is-leaving {
+  opacity: 0;
+  transform: scale(.96);
+  transition: opacity .16s ease, transform .16s ease;
+  pointer-events: none;
+}
+
+.tracktube-link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tracktube-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--tracktube-surface);
+}
+
+.tracktube-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Values read off YouTube's native badge, identically: 500 12px/18px, black
+   ground at 60 %, radius 4 px, inner margins 1 px by 4 px. The box is then
+   exactly the same size as the one next to it. */
+.tracktube-duration {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.tracktube-live { background: var(--tracktube-action); font-weight: 700; letter-spacing: .3px; }
+.tracktube-scheduled { background: rgba(0, 0, 0, .8); color: var(--tracktube-gold); }
+
+/* Replay of a live. The coloured edge is enough to recognise it at a glance
+   without giving it the urgency of a live under way, which the solid ground
+   implied. */
+.tracktube-replay { border-left: 3px solid color-mix(in srgb, var(--tracktube-action) 75%, #000); padding-left: 5px; }
+
+.tracktube-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, .3);
+}
+
+.tracktube-progress i { display: block; height: 100%; background: var(--tracktube-action); }
+
+.tracktube-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0 0;
+}
+
+/* `min-width: 0` is indispensable: without it, a long title refuses to
+   compress and pushes the ⋮ button out of the card. */
+.tracktube-text { flex: 1; min-width: 0; }
+
+.tracktube-title-link { display: block; color: inherit; text-decoration: none; }
+
+/* Thumbnail folded away after hiding. The node stays in place so that an undo
+   puts it back exactly where it was, without reloading the grid. */
+.tracktube-card.is-removed { display: none; }
+
+.tracktube-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--tracktube-surface);
+  object-fit: cover;
+}
+
+/* Fallback when the avatar is unknown or could not be loaded. A coloured badge
+   beats the browser's "broken image" icon. */
+.tracktube-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--tracktube-avatar-hue, 210) 45% 38%);
+  color: #fff;
+  font: 600 15px/1 Roboto, Arial, sans-serif;
+  user-select: none;
+}
+
+/* Same metrics as YouTube's native feed: 16 px / 22 px semi bold for the
+   title, 14 px / 20 px for the metadata. They were already written, but in an
+   invalid `font` shorthand — so never applied, and the text inherited the
+   page's 14 px. Hence the impression, an accurate one, that our grid was less
+   readable than the one next to it. */
+.tracktube-title {
+  margin: 0 0 5px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 22px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.tracktube-byline,
+.tracktube-stats {
+  display: block;
+  color: var(--tracktube-muted);
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* The byline is a link now, for middle click and control click. It must not
+   take a link's colour or its underline: it is a name, not a destination. */
+.tracktube-byline { width: fit-content; cursor: pointer; text-decoration: none; }
+.tracktube-byline:hover { color: var(--tracktube-text); text-decoration: underline; }
+html.tracktube-selecting .tracktube-byline { cursor: inherit; text-decoration: none; }
+
+/* --------------------------------------------------------------- hiding --- */
+
+/* The button stays outside the link: without this, the click would trigger
+   navigation. It appears on hover, but stays reachable from the keyboard. */
+.tracktube-hide {
+  position: absolute;
+  z-index: 3;
+  /* 8 px from the thumbnail's edge, hence 8 px of padding on top. */
+  top: 16px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .75);
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+/* `:hover` on the button itself, on top of the card's: if the card's hover is
+   lost at the moment the pointer reaches the button — which can happen when one
+   of YouTube's sticky elements passes over — the button stays visible and
+   clickable instead of vanishing under the cursor. */
+.tracktube-card:hover .tracktube-hide,
+.tracktube-card:hover .tracktube-sound,
+.tracktube-hide:hover,
+.tracktube-sound:hover,
+.tracktube-hide:focus-visible,
+.tracktube-sound:focus-visible { opacity: 1; }
+.tracktube-hide:hover { background: var(--tracktube-action); }
+
+/* Right under the cross: same 32 px box, same circle, same 8 px gutter, so the
+   two read as one column. 16 + 32 + 8 = 56. Both hang from the card — hung from
+   the thumbnail instead, which is eight pixels narrower, this one sat eight
+   pixels to the left of the cross.
+
+   It follows the cross in everything, its appearing included: same rule, same
+   selectors, listed with it above. Giving it a life of its own — always opaque,
+   since a preview only runs under the cursor — read as a bug, because the two
+   buttons then behaved differently for no reason one could see. */
+.tracktube-sound {
+  position: absolute;
+  z-index: 3;
+  top: 56px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .75);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+.tracktube-sound svg {
+  width: 18px;
+  height: 18px;
+  /* One colour, taken from the button: the icon follows the hover without a
+     second rule. */
+  fill: currentColor;
+}
+
+.tracktube-sound:hover { background: var(--tracktube-action); }
+
+/* The selection takes the whole card: a click meant for the sound would leave
+   the choice half made. Same reasoning as the cross above. */
+html.tracktube-selecting .tracktube-sound { display: none; }
+
+/* ------------------------------------------------------------- priority --- */
+
+.tracktube-star {
+  position: absolute;
+  z-index: 3;
+  top: 16px;
+  left: 16px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .75);
+  color: rgba(255, 255, 255, .8);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s, color .12s, background .12s;
+}
+
+.tracktube-card:hover .tracktube-star,
+.tracktube-star:hover,
+.tracktube-star:focus-visible { opacity: 1; }
+
+/* Hover has to answer, as on the hide button. The star was already opaque as
+   soon as the card was hovered: putting the cursor on it therefore changed
+   nothing on screen, and nothing said it was clickable. The colour announces
+   what the click will do, gold to mark… */
+.tracktube-star:hover { background: var(--tracktube-gold); color: #07070e; }
+
+/* … and grey to remove the mark, the way the hide button's green announces the
+   return into the feed. */
+.tracktube-card.is-starred .tracktube-star:hover { background: #59596e; color: #fff; }
+
+/* A priority video keeps its star permanently visible: it is the marker, not
+   merely a command. */
+.tracktube-card.is-starred .tracktube-star { opacity: 1; color: var(--tracktube-gold); }
+
+.tracktube-card.is-starred .tracktube-thumb::after { border-color: var(--tracktube-gold); }
+
+/* The edge is three pixels and lands exactly on the playback bar, which is the
+   same: made a priority, a started video lost its bar. We tuck the bar inside
+   the frame rather than sacrifice either. The same goes for the selection,
+   which has the same edge. */
+.tracktube-card.is-starred .tracktube-progress,
+.tracktube-card.is-selected .tracktube-progress { bottom: 3px; left: 3px; right: 3px; }
+
+/* The selection wins visually: it is the action under way. */
+.tracktube-card.is-selected .tracktube-thumb::after { border-color: var(--tracktube-accent); }
+
+html.tracktube-selecting .tracktube-star { display: none; }
+
+/* ---------------------------------------------------- hidden videos seen --- */
+
+/* Rendered normally: the "Hidden" view contains nothing else, so greying them
+   out or labelling them would inform about nothing and would hinder reading.
+   Only the button stays permanently visible, since it is the action expected
+   here — putting the video back into the feed. */
+.tracktube-card.is-hidden .tracktube-hide { opacity: 1; }
+.tracktube-card.is-hidden .tracktube-hide:hover { background: #1f7a3d; }
+
+/* ---------------------------------------------------------- hover preview --- */
+
+/* The preview never takes the cursor: the click passes through and opens the
+   video, and the card keeps receiving hover, hence knowing when to stop. It
+   stays transparent as long as the animation is not loaded, so that the still
+   never gives way to an empty rectangle. It is served at 320 by 180, the
+   thumbnail's own format: the cropping only serves the rounded corners. */
+.tracktube-preview {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .25s;
+}
+
+.tracktube-preview.is-ready { opacity: 1; }
+
+/* The duration belongs to the frozen still; the progress bar, for its part,
+   says where one is and stays useful over the animation. */
+.tracktube-thumb.is-previewing .tracktube-duration { opacity: 0; }
+.tracktube-progress { z-index: 2; }
+
+/* The video, when YouTube returns a readable stream of it. Same place and same
+   cropping as the animation, which it replaces as soon as it has something to
+   show. */
+.tracktube-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  object-fit: cover;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .25s;
+}
+
+.tracktube-thumb.is-playing .tracktube-video { opacity: 1; }
+
+/* The animation has done its job: it held the thumbnail while the video
+   started, and says nothing more than it does. The playback progress fades too,
+   otherwise two coloured lines would fight over the bottom of the thumbnail: from
+   there on it is the rail that follows playback. */
+.tracktube-thumb.is-playing .tracktube-preview { opacity: 0; }
+.tracktube-thumb.is-playing .tracktube-duration { opacity: 0; }
+.tracktube-thumb.is-playing .tracktube-progress { opacity: 0; }
+
+/* The scrub: YouTube's hover sheets, those of its progress bar, shown in a
+   small box laid above the rail. Only one picture is visible at a time, cut out
+   of the sheet by the background: the background's position and size do all the
+   work, with no node per picture.
+
+   The box replaces a layer that painted the picture over the whole thumbnail.
+   It covered playback, and the click meant to resume at a precise point gave
+   the thumbnail back to its animation: the gesture looked like going back to
+   the start when it was moving forward. */
+.tracktube-scrub {
+  position: absolute;
+  left: 0;
+  bottom: 16px;
+  z-index: 6;
+  width: 158px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+/* The frame shows as soon as the cursor is over the thumbnail, not only over
+   the band that moves playback: running across a preview is how one looks for a
+   moment in it, and the video keeps playing underneath. */
+.tracktube-thumb.is-aiming .tracktube-scrub { opacity: 1; }
+
+/* The frame itself. It needs its size written here: `placeSheet` sets the three
+   background properties and nothing else, and an `<i>` is inline, so without
+   this rule the element measured 158 x 0 and the sheet was painted into nothing.
+   158 x 89 is the cell of the storyboard level YouTube's own player uses on
+   hover, and the box is one cell wide, hence `PREVIEW_SHEET_PX` on the other
+   side.
+
+   `no-repeat` is required, not tidiness: the background is sized at
+   `columns * 100%` by `rows * 100%` to bring one cell into view, and the default
+   `repeat` tiles that whole grid, which lands a neighbouring cell in every
+   corner of the box. */
+.tracktube-scrub i {
+  display: block;
+  height: 89px;
+  border-radius: 2px;
+  background-repeat: no-repeat;
+  background-color: #000;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .7), 0 1px 4px rgba(0, 0, 0, .5);
+}
+
+/* The instant, under the frame rather than over it: laid on the picture it fell
+   on whatever that picture happened to be, and a white figure on a bright frame
+   is unreadable exactly when one is aiming at it. */
+.tracktube-scrub span {
+  display: block;
+  margin-top: 3px;
+  text-align: center;
+  color: #fff;
+  font: 600 12px/1.4 Roboto, Arial, sans-serif;
+  text-shadow: 0 0 3px rgba(0, 0, 0, .9);
+}
+
+/* The rail says two things: that the thumbnail can be scrubbed, and where one
+   is. It only appears once the sheets have arrived, otherwise it would promise
+   what hover cannot yet hold. */
+.tracktube-scrub-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  height: 3px;
+  background: rgba(255, 255, 255, .3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .12s, height .1s, bottom .1s;
+}
+
+.tracktube-scrub-bar.is-ready { opacity: 1; }
+
+/* Three stacked lines, as in the player, from the most discreet to the most
+   vivid. The grey ground says the whole video. The lightened one says how far
+   the cursor has come down, and nothing else: it is an aiming mark, not
+   playback. The solid line says where the video really is. */
+.tracktube-scrub-bar u {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, .6);
+}
+
+.tracktube-scrub-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 100%;
+  background: var(--tracktube-action);
+}
+
+/* The tail the server refuses to serve, once a refusal has told us where it
+   starts. Darker than the ground rather than another colour: it is not an error,
+   it is a part of the rail that does not answer. Scrubbing still works over it,
+   only playback does not. */
+.tracktube-scrub-bar s {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 0;
+  height: 100%;
+  background: rgba(0, 0, 0, .45);
+}
+
+/* The dot does not follow the mouse: it sits at the end of the solid line, hence at
+   the instant the video is playing. A second dot under the cursor would suggest
+   two playheads, when there is only one. */
+.tracktube-scrub-bar b {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 11px;
+  height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  border-radius: 50%;
+  background: var(--tracktube-action);
+  opacity: 0;
+  transition: opacity .12s;
+}
+
+.tracktube-thumb.is-playing .tracktube-scrub-bar b { opacity: 1; }
+
+/* The cursor has come down into the rail's band, the only one that scrubs: the
+   line thickens to say so, as in the player, and lifts off the bottom.
+
+   That setback is not decorative. Flush with the edge, the dot is cut in half
+   and aiming at the end of the video means running along the window's edge. A
+   few pixels of margin make the gesture bearable and the dot whole. */
+.tracktube-thumb.is-scrubbing .tracktube-scrub-bar { height: 5px; bottom: 7px; }
+
+/* While scrubbing, the playback progress no longer relates to what is on
+   screen. This rule cancels the preview's above: same weight, written after. */
+.tracktube-thumb.is-scrubbing .tracktube-progress { opacity: 0; }
+
+/* --------------------------------------------------------------- ⋮ menu --- */
+
+/* Placed in the metadata line, level with the text and not with the thumbnail
+   — that is the position it holds in YouTube's feed, at the same metrics: a
+   40 px target for a 24 px glyph, and the grey disc on hover. It is permanently
+   visible: making it appear on hover forced one to discover its existence, and
+   moved the eye at the precise moment one was already looking for something. */
+.tracktube-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  align-self: flex-start;
+  width: 40px;
+  height: 40px;
+  /* Shifted 8 px up and right so that the glyph, and not the target, lines up
+     with the title's first line and with the text's edge. The negative margin
+     fits inside the card's padding, so nothing is cut by the paint
+     containment. */
+  margin: -8px -8px 0 0;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--tracktube-text);
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background .12s;
+}
+
+.tracktube-menu-btn:hover,
+.tracktube-menu-btn:focus-visible { background: var(--tracktube-hover-layer); }
+.tracktube-menu-btn[aria-expanded="true"] { background: var(--tracktube-hover-layer); }
+
+html.tracktube-selecting .tracktube-menu-btn { display: none; }
+
+.tracktube-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 230px;
+  padding: 6px 0;
+  border-radius: 10px;
+  background: #22222e;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, .5);
+  font: 400 14px/1.2 Roboto, Arial, sans-serif;
+}
+
+.tracktube-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: none;
+  color: #e9e9f5;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tracktube-menu button:hover { background: rgba(255, 255, 255, .1); }
+
+.tracktube-menu-sep {
+  height: 0;
+  margin: 6px 0;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, .15);
+}
+
+/* ------------------------------------------------------------ selection --- */
+
+/* In selection mode, the whole thumbnail becomes a checkbox: the click is
+   intercepted upstream of the link, so nothing opens. */
+html.tracktube-selecting .tracktube-link { cursor: pointer; }
+html.tracktube-selecting .tracktube-hide { display: none; }
+
+/* Cuts text selection on shift click, which would highlight the whole range. */
+html.tracktube-selecting .tracktube-grid { user-select: none; }
+
+.tracktube-tick {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, .85);
+  background: rgba(0, 0, 0, .45);
+  color: transparent;
+  font-size: 14px;
+  line-height: 21px;
+  text-align: center;
+  display: none;
+}
+
+html.tracktube-selecting .tracktube-tick { display: block; }
+
+.tracktube-card.is-selected .tracktube-tick {
+  background: var(--tracktube-accent);
+  border-color: var(--tracktube-accent);
+  color: #07070e;
+}
+
+/* The selection outline is drawn INSIDE the thumbnail, by a pseudo element.
+
+   An `outline` with `outline-offset` was cut on three sides: the card carries
+   `content-visibility: auto`, which implies paint containment, and everything
+   overflowing its box is cut. Only the bottom stayed visible, where the
+   metadata area left room. */
+.tracktube-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid transparent;
+  border-radius: inherit;
+  /* Above the preview: a star or selection edge covered by a hover sheet would
+     give the impression of having lost its state. */
+  z-index: 4;
+  pointer-events: none;
+  transition: border-color .12s;
+}
+
+.tracktube-card.is-selected .tracktube-thumb::after { border-color: var(--tracktube-accent); }
+.tracktube-card.is-selected .tracktube-thumb img { opacity: .65; }
+
+/* --------------------------------------------------------------- sundry --- */
+
+.tracktube-status {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--tracktube-muted);
+  font-size: 14px;
+}
+
+.tracktube-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #1b1b26;
+  color: #fff;
+  font: 500 14px/1.2 "Roboto", Arial, sans-serif;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, .5);
+}
+
+/* The toast now carries this button only: the count that came with it repeated
+   what the thumbnail's disappearance had just shown. The capitals went with it,
+   they were the interface's only text to carry any outside the broadcast
+   badges. */
+.tracktube-toast button {
+  border: none;
+  background: none;
+  color: var(--tracktube-accent);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Thumbnail buttons taken out from the settings. The node stays in place: that
+   is what lets them reappear without rebuilding the grid. */
+#tracktube-root.tracktube-no-hide .tracktube-hide,
+#tracktube-root.tracktube-no-star .tracktube-star { display: none; }

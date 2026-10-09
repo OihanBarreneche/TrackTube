@@ -1,0 +1,94 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>TrackTube — chargement des modules</title>
+<style>
+  body { font: 14px/1.6 system-ui; background: #0f0f0f; color: #f1f1f1; padding: 24px; }
+  li { margin: 3px 0; }
+  .ok::before { content: '✓ '; color: #4ade80; }
+  .ko::before { content: '✗ '; color: #f87171; }
+  .ko { color: #f87171; }
+</style>
+
+<h1>Chargement des modules</h1>
+<p>
+  Chaque module est réellement importé, et non compilé à la main. La différence
+  n'est pas théorique : un contrôle par <code>new Function</code> compile en mode
+  non strict, où une fonction déclarée deux fois est tolérée. Un module, lui, la
+  refuse — et le doublon, invisible au contrôle, avait mis toute l'extension par
+  terre.
+</p>
+<p>
+  Les modules qui touchent aux API de l'extension échouent forcément ici, faute
+  de <code>chrome.runtime</code> : ce qui compte est la <em>nature</em> de
+  l'erreur. Une erreur de syntaxe est un défaut ; une erreur d'exécution sur une
+  API absente est attendue.
+</p>
+<p id="score">…</p>
+<ul id="results"></ul>
+
+<script type="module">
+  const MODULES = [
+    'src/lib/messages.js',
+    'src/lib/ui-snapshot.js',
+    'src/lib/db.js',
+    'src/lib/rss.js',
+    'src/lib/log.js',
+    'src/lib/util.js',
+    'src/lib/i18n.js',
+    'src/lib/i18n-dom.js',
+    'src/lib/locales/fr.js',
+    'src/lib/locales/en.js',
+    'src/lib/feed-options.js',
+    'src/lib/triage-order.js',
+    'src/lib/innertube-parse.js',
+    'src/lib/short-policy.js',
+    'src/lib/history.js',
+    'src/lib/account.js',
+    'src/popup/popup.js',
+    'src/pages/journal.js',
+    'src/pages/history.js',
+    'src/pages/onboarding.js',
+    'src/pages/retro.js',
+    'src/pages/duel-game.js',
+    'src/pages/tournament.js',
+    'src/content/main.js',
+    'src/content/channel-sweep.js',
+    'src/content/active-account.js',
+    'src/content/triage.js',
+    'src/content/batch.js',
+    'src/content/innertube.js',
+    'src/content/feed-view.js',
+    'src/content/watch-tracker.js',
+    'src/background/scheduler.js',
+    'src/background/sync-engine.js',
+    'src/background/innertube-direct.js',
+    'src/background/shorts.js',
+    'src/background/audit.js',
+    'src/background/service-worker.js',
+  ];
+
+  const results = document.getElementById('results');
+  let pass = 0, fail = 0;
+
+  for (const path of MODULES) {
+    let verdict = null;
+    try {
+      await import(`/${path}`);
+    } catch (err) {
+      // Seules les erreurs de compilation condamnent un module. Le reste vient
+      // de l'absence des API d'extension dans une page ordinaire.
+      const syntaxique = err instanceof SyntaxError;
+      if (syntaxique) verdict = `${err.name} : ${err.message}`;
+    }
+
+    const li = document.createElement('li');
+    li.className = verdict ? 'ko' : 'ok';
+    li.textContent = verdict ? `${path} — ${verdict}` : path;
+    results.append(li);
+    verdict ? fail++ : pass++;
+  }
+
+  const score = document.getElementById('score');
+  score.textContent = fail ? `${fail} module(s) en erreur sur ${pass + fail}` : `${pass} modules compilent`;
+  score.className = fail ? 'ko' : 'ok';
+</script>

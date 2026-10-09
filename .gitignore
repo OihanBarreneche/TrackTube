@@ -1,0 +1,45 @@
+# What this file separates
+#
+# The folder on disk is both the working place and the extension. Everything
+# needed to load, run, test and understand the extension is published; the
+# working notes are not. The rule is an allowlist for `docs/`, not a list of
+# exclusions: a note written next week is private by default, which is the safe
+# direction. Adding a public document therefore means adding a line here.
+#
+# `CLAUDE.md` is deliberately published. It is the only document that explains
+# why the code is shaped the way it is, and a contributor who does not have it
+# will reopen decisions that were settled after a bug.
+
+# ---------------------------------------------------------------- the notes
+# Everything under docs/, then the few files that are part of the product.
+docs/*
+!docs/LIMITES.md
+
+# Dated investigations, screenshots, audit captures, rejected experiments.
+docs/audit-*/
+docs/revue-ui/
+experiments/
+
+# ------------------------------------------------------------- the leftovers
+# Fixtures pulled from a real account while debugging.
+test/.tmp-*
+
+# Avatars `tools/shoot.py` caches to keep a capture deterministic. They are
+# other people's pictures and belong on their own servers, not in here.
+test/fixtures/.avatars/
+
+# Editor and OS.
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+*.bak
+
+# Packaged candidates and Python bytecode.
+dist/
+__pycache__/
+*.pyc
+
+# Local servers and scratch files.
+.port
+*.local.json

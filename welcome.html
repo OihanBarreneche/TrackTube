@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title data-i18n="onb.page.title">TrackTube — prise en main</title>
+  <link rel="stylesheet" href="src/pages/onboarding.css">
+</head>
+<body>
+
+<header>
+  <div class="wordmark">
+    <img src="icons/icon-48.png" alt="">
+    <b>TrackTube</b>
+    <span id="version"></span>
+    <!-- The language, here and not only in the popup's settings. This is the
+         first page the extension ever shows, it starts in the browser's own
+         language, and someone who does not want that one had to find the
+         settings of a popup they have not opened yet to change it. -->
+    <select id="onb-lang" data-i18n-label="set.lang" aria-label="Langue">
+      <option value="fr">Français</option>
+      <option value="en">English</option>
+    </select>
+    <!-- A visible way out from the very first step. This screen opens by itself
+         on install: with no button to leave it, it reads as a compulsory
+         passage when nothing in it is required. -->
+    <button id="btn-skip" class="link" data-i18n="onb.skip">Ignorer</button>
+  </div>
+  <!-- The pips are populated by the script: the number of steps lives in one
+       place only, otherwise one is added and a marker goes missing. -->
+  <nav class="steps-bar" id="steps-bar" data-i18n-label="onb.progress.aria" aria-label="Progression"></nav>
+  <p class="grey"><a href="privacy.html" target="_blank" rel="noopener" data-i18n="docs.privacy">Confidentialité</a>
+    <a class="repo-link" href="#" target="_blank" rel="noopener" data-i18n="docs.repo" hidden>Signaler un problème ou proposer une idée</a></p>
+</header>
+
+<!--
+  Three steps: what it is for, fetch the subscriptions, done.
+
+  It had six. Four of them described hiding, starring, searching, the collection
+  cadence, the live feeds and the card by card triage — every one of which the
+  popup's help panel already explains, at greater length and where someone goes
+  when the question comes up. Repeating it here only pushed the single action
+  that has to happen, reading the subscription list, to screen three of six, and
+  put the reserves on the promise ahead of the promise itself.
+
+  So the reserves moved to that same help panel, beside what they qualify:
+  `docs.what.p3` for a Short that slips through while its classification is
+  still pending, `docs.hide.p4` for YouTube never seeing what you hide.
+-->
+<main>
+
+  <!-- ============================================================== 1. why -->
+  <section class="step" data-step="0">
+    <h1 data-i18n="onb.s1.h">Tes abonnements, dans l’ordre</h1>
+    <p class="grey" data-i18n="onb.s1.p">TrackTube remplace ta page Abonnements par tout ce qu’ont publié les chaînes que tu suis, dans l’ordre et sans rien d’autre. Une liste de vidéos à voir, que tu vides.</p>
+
+    <ul class="bullets">
+      <li>
+        <svg class="bullet" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        <div>
+          <b data-i18n="onb.s1.a.t">Chronologique et complet</b>
+          <p data-i18n="onb.s1.a.d">Les flux publics de chaque chaîne alimentent la liste, une chaîne après l’autre, sans classement ni sélection.</p>
+        </div>
+      </li>
+      <li>
+        <svg class="bullet" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M6.3 6.3 17.7 17.7"/></svg>
+        <div>
+          <b data-i18n="onb.s1.b.t">Sans Shorts</b>
+          <p data-i18n="onb.s1.b.d">Ils sont exclus du feed, des durées et des moyennes.</p>
+        </div>
+      </li>
+      <li>
+        <svg class="bullet" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12.5 10 18 19.5 6.5"/></svg>
+        <div>
+          <b data-i18n="onb.s1.c.t">Une liste qui se vide</b>
+          <p data-i18n="onb.s1.c.d">Masque d’un clic, étoile ce qui compte, reprends où tu t’étais arrêté. Et si tu l’actives, une vidéo regardée s’en va toute seule.</p>
+        </div>
+      </li>
+    </ul>
+
+    <p class="grey" data-i18n="onb.s1.aussi">
+      Deux outils viennent avec : l’analyse de tout ce que tu regardes, et un
+      tri de tes abonnements carte par carte.
+    </p>
+
+    <div class="actions">
+      <button class="button primary pushed-right" data-go="1" data-i18n="onb.start">Commencer</button>
+    </div>
+  </section>
+
+  <!-- =================================================== 2. subscriptions -->
+  <section class="step" data-step="1" hidden>
+    <h1 data-i18n="onb.s3.h">Récupérer tes abonnements</h1>
+    <p class="grey" data-i18n="onb.s3.p">
+      L’extension a besoin de savoir qui tu suis. Elle lit la liste sur
+      YouTube, une fois, dans l’onglet où tu es déjà connecté.
+    </p>
+
+    <div class="card">
+      <div class="actions" style="margin: 0">
+        <button id="btn-import" class="button primary" data-i18n="onb.s3.btn">Importer mes abonnements</button>
+      </div>
+      <div id="import-status" class="status" hidden></div>
+      <p class="grey" id="import-note" data-i18n="onb.s3.note">Reste sur cette page : l’import avance en arrière-plan. Sa durée dépend de ta liste et de YouTube.</p>
+      <p class="grey" data-i18n="onb.s3.compte">La base est rattachée au compte détecté. Utilise un profil de navigateur distinct pour un autre compte.</p>
+    </div>
+
+    <div class="actions">
+      <button class="button quiet" data-go="-1" data-i18n="onb.back">Retour</button>
+      <button class="button pushed-right" data-go="1" id="btn-later" data-i18n="onb.later">Plus tard</button>
+      <button class="button primary pushed-right" data-go="1" id="btn-import-next" hidden data-i18n="onb.next">Suivant</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ 3. ready -->
+  <section class="step" data-step="2" hidden>
+    <h1 data-i18n="onb.s5.h">C’est prêt</h1>
+    <p class="grey" data-i18n="onb.s5.p">Un dernier choix, et ton feed s’ouvre.</p>
+
+    <div class="choice">
+      <label>
+        <input type="radio" name="releve" value="oui">
+        <div>
+          <b data-i18n="onb.s5.yes.t">Relever ce que je regarde</b>
+          <p data-i18n="onb.s5.yes.d">Optionnel et désactivé au départ. L’enregistrement reste local.</p>
+        </div>
+      </label>
+      <label>
+        <input type="radio" name="releve" value="non" checked>
+        <div>
+          <b data-i18n="onb.s5.no.t">Ne rien relever</b>
+          <p data-i18n="onb.s5.no.d">Le feed montre tout, sans distinction entre vu et pas vu.</p>
+        </div>
+      </label>
+    </div>
+
+    <p class="grey" data-i18n="onb.s5.note">Modifiable à tout moment au bas de l’onglet Historique.</p>
+
+    <!-- The Takeout import used to sit in a catch all screen at the end of the
+         journey. It belongs to this one: it is the same history, seen from its
+         other end. -->
+    <div class="card">
+      <b data-i18n="onb.s5.avant.t">Et tes années d’avant</b>
+      <p class="grey" data-i18n="onb.s5.avant.d">Un export Google Takeout permet d’importer ton ancien historique. Les dates et contenus disponibles dépendent de l’export.</p>
+      <div class="actions" style="margin-top: 10px">
+        <button id="btn-history-page" class="button" data-i18n="onb.s5.btn">Importer mon historique</button>
+      </div>
+    </div>
+
+    <p class="grey" data-i18n="onb.s5.aide">
+      Le reste s’explique dans l’aide de la popup : masquer et prioriser, le
+      rythme de collecte, le tri des abonnements, et où vont tes données.
+    </p>
+
+    <div class="actions">
+      <button class="button quiet" data-go="-1" data-i18n="onb.back">Retour</button>
+      <button class="button primary pushed-right" id="btn-finish" data-i18n="onb.finish">Ouvrir mon feed</button>
+    </div>
+  </section>
+
+</main>
+
+<script type="module" src="src/pages/onboarding.js"></script>
+</body>
+</html>

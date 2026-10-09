@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title data-i18n="jou.doctitle">TrackTube, historique détaillé</title>
+  <link rel="stylesheet" href="src/pages/journal.css">
+</head>
+<body>
+  <!-- A page of its own, and not a fourth view of the analysis.
+
+       Sharing that page meant carrying its whole top above this one: the range
+       bar, the channel search and the three game cards, none of which mean
+       anything here. What is read here is one day at a time; what is read there
+       is a range. Two readings, two pages. -->
+  <header>
+    <a class="back" href="history.html" data-i18n="jou.back">← Analyse</a>
+    <h1 data-i18n="jou.h1">Historique détaillé</h1>
+    <span class="spacer"></span>
+  </header>
+
+  <!-- Shown from the start and removed by the script: reading a history of
+       several years takes a few seconds, and an empty page does not tell
+       "computing" from "broken". -->
+  <section id="startup" class="startup">
+    <span class="spinner" aria-hidden="true"></span>
+    <span data-i18n="jou.boot">Lecture de ton historique…</span>
+  </section>
+
+  <main id="page" hidden>
+    <!-- The arrows do not step one day at a time: they land on the next day that
+         actually holds something. Stepping through a quiet week meant seven
+         empty screens in a row, and an empty day teaches nothing. The date field
+         is there for whoever wants a precise day, empty or not. -->
+    <section class="day-head">
+      <div class="day-nav">
+        <button id="day-prev" class="arrow" data-i18n-label="jou.prev" aria-label="Jour précédent avec des visionnages">‹</button>
+        <input id="day-date" type="date" data-i18n-label="jou.pick" aria-label="Choisir un jour">
+        <button id="day-next" class="arrow" data-i18n-label="jou.next" aria-label="Jour suivant avec des visionnages">›</button>
+      </div>
+
+      <h2 id="day-title">—</h2>
+      <p class="today-line"><button id="day-today" class="linkish" data-i18n="jou.today">Aujourd'hui</button></p>
+
+      <div class="figures">
+        <div class="figure">
+          <span class="caption" data-i18n="jou.views">Visionnages</span>
+          <b id="day-count">—</b>
+        </div>
+        <div class="figure">
+          <span class="caption" data-i18n="jou.channels">Chaînes</span>
+          <b id="day-channels">—</b>
+        </div>
+        <!-- The measurement alone, nothing added and nothing assumed. The
+             figure shown here used to be the analysis page's mixed model, which
+             credits a video no opening of which was measured with its whole
+             length: a day of four two hour videos merely opened announced
+             eleven hours watched. That model is right over a range of months,
+             where the unmeasured openings average out; it is a guess on one
+             day, and this page exists to show what is not a guess. -->
+        <div class="figure">
+          <span class="caption" data-i18n="jou.time">Temps mesuré</span>
+          <b id="day-hours">—</b>
+        </div>
+      </div>
+
+      <!-- What the day rests on, in one sentence: how many of its videos have a
+           known length, what they add up to, and how much of that was really
+           measured. -->
+      <p class="coverage" id="day-coverage"></p>
+    </section>
+
+    <!-- The same reading as the analysis page's rhythm, on one day. Both charts
+         rest on the rows that carry an hour, which is why each says underneath
+         how many rows it was drawn on: a day made only of collected rows would
+         otherwise show two empty charts with nothing saying why.
+
+         Each carries a vertical scale, and each bar gives its figure on hover:
+         a bar chart with no axis says which hour was the busiest and nothing
+         about how busy. The figure is drawn in the page, not handed to the
+         browser as a `title`: the grey box arrives a second late and lands
+         outside the design. -->
+    <section class="charts" id="charts">
+      <div class="chart">
+        <h3 data-i18n="jou.chart.count">Vidéos ouvertes, par heure</h3>
+        <div class="plot">
+          <div class="yaxis" id="axis-count"></div>
+          <div class="bars" id="chart-count"></div>
+          <div class="hours" id="hours-count"></div>
+        </div>
+        <p class="muted" id="chart-count-note"></p>
+      </div>
+      <div class="chart">
+        <h3 data-i18n="jou.chart.time">Minutes regardées, par heure</h3>
+        <div class="plot">
+          <div class="yaxis" id="axis-time"></div>
+          <div class="bars" id="chart-time"></div>
+          <div class="hours" id="hours-time"></div>
+        </div>
+        <p class="muted" id="chart-time-note"></p>
+      </div>
+    </section>
+
+    <div class="list-head">
+      <!-- Sorting on a value a row does not have is not sorting: those rows go
+           to the bottom whichever way the arrow points, rather than filling the
+           top with zeros that would read as measurements. -->
+      <div class="sorts" id="sorts">
+        <button class="sort" data-field="watchedAt" data-i18n="jou.sort.hour">Heure</button>
+        <button class="sort" data-field="durationSec" data-i18n="jou.sort.length">Durée</button>
+        <button class="sort" data-field="watchedSec" data-i18n="jou.sort.watched">Temps vu</button>
+      </div>
+    </div>
+
+    <div id="day-list" class="day-list"></div>
+    <p class="muted empty" id="day-empty" hidden data-i18n="jou.empty">Aucun visionnage ce jour là.</p>
+  </main>
+
+  <script type="module" src="src/pages/journal.js"></script>
+</body>
+</html>
