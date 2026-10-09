@@ -114,6 +114,6 @@
   </g>
   <circle cx="1068" cy="454" r="15" fill="#3b2635" stroke="#ff7d8e" stroke-width="1.5"/>
   <path d="M1062 448l12 12m0-12l-12 12" fill="none" stroke="#ff7d8e" stroke-width="3" stroke-linecap="round"/>
-  <circle cx="1318" cy="454" r="15" fill="#233a39" stroke="#8cddb9" stroke-width="1.5"/>
-  <path d="M1310 454l5 5 11-12" fill="none" stroke="#8cddb9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="1318" cy="463" r="15" fill="#233a39" stroke="#8cddb9" stroke-width="1.5"/>
+  <path d="M1310 463l5 5 11-12" fill="none" stroke="#8cddb9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
