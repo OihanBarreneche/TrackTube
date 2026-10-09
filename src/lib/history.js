@@ -1712,6 +1712,24 @@ export function formatDuration(seconds) {
     : t('dur.hour', { n: h });
 }
 
+/**
+ * A delay between a publication and an opening, in words.
+ *
+ * The unit follows the size, because the reader divides otherwise. Hours are
+ * kept up to a day and a half: "30 hours after publication" says more than
+ * "1 day", while "45 hours" past that point only makes one count on their
+ * fingers.
+ */
+export function formatDelay(ms) {
+  const hours = ms / 3_600_000;
+  if (hours < 1) return t('hist.delay.min', { n: Math.max(1, Math.round(ms / 60_000)) });
+  if (hours < 36) return t('hist.delay.hour', { n: Math.round(hours) });
+  const days = hours / 24;
+  if (days < 60) return t('hist.delay.day', { n: Math.round(days) });
+  if (days < 730) return t('hist.delay.month', { n: Math.round(days / 30.44) });
+  return t('hist.delay.year', { n: Math.round(days / 365.25) });
+}
+
 /** Relative change between two periods, `null` if the previous one is empty. */
 export function variation(current, previous) {
   if (!Number.isFinite(previous) || previous <= 0) return null;
@@ -1806,6 +1824,71 @@ export function computeWatchDelays(entries, published, { from = 0, to = Date.now
     median: delays.length ? median(delays) : null,
     known: delays.length,
     total,
+  };
+}
+
+/**
+ * The same delay, channel by channel, fastest first.
+ *
+ * The overall median says how fast you are; it cannot say who you are fast
+ * **for**, and that is the more interesting half. Someone with a median of three
+ * days usually has two or three channels they open the same evening and a tail
+ * they get to when they get to.
+ *
+ * Two rules keep it from being noise.
+ *
+ * **One delay per video, not per opening.** A video reopened a year later would
+ * otherwise drag its channel's median across the whole range, so only the
+ * earliest opening of each video counts: the delay measures how fast you came,
+ * not how long you kept coming back.
+ *
+ * **A channel needs `minVideos` of them.** With a floor of one, a channel you
+ * watched once, two minutes after it published, wins the podium on a single
+ * row and tells you nothing. Three is the same floor
+ * `unsubscribedCandidates` uses, and the count travels with each row so the
+ * screen can say what the figure rests on.
+ */
+export function computeChannelDelays(entries, published, {
+  from = 0, to = Date.now(), minVideos = 3, topN = 5,
+} = {}) {
+  // Earliest opening of each video, within the range.
+  const first = new Map();
+  for (const e of entries) {
+    if (e.watchedAt < from || e.watchedAt > to) continue;
+    if (!e.channelId || !e.videoId) continue;
+    const seen = first.get(e.videoId);
+    if (!seen || e.watchedAt < seen.watchedAt) first.set(e.videoId, e);
+  }
+
+  const byChannel = new Map();
+  for (const e of first.values()) {
+    const at = published.get(e.videoId);
+    if (!(at > 0)) continue;
+    const delay = e.watchedAt - at;
+    // A viewing dated before its publication is a broken row, not a fast
+    // viewer: a row read off YouTube's history page sits at local noon, so one
+    // collected on the day of publication can land hours before it.
+    if (delay < 0) continue;
+    const row = byChannel.get(e.channelId)
+      ?? { channelId: e.channelId, title: e.channelTitle || e.channelId, delays: [] };
+    row.title = e.channelTitle || row.title;
+    row.delays.push(delay);
+    byChannel.set(e.channelId, row);
+  }
+
+  const eligible = [...byChannel.values()].filter((c) => c.delays.length >= minVideos);
+  const channels = eligible
+    .map((c) => ({ channelId: c.channelId, title: c.title, median: median(c.delays), n: c.delays.length }))
+    .sort((a, b) => a.median - b.median || b.n - a.n)
+    .slice(0, topN);
+
+  return {
+    channels,
+    // What the podium had to choose from, so a podium of two says why it is a
+    // podium of two rather than looking truncated.
+    eligible: eligible.length,
+    considered: byChannel.size,
+    minVideos,
   };
 }
 

@@ -38,7 +38,8 @@ import {
   computeStats, computeChannelStreaks, extractThemes, classifyTopics,
   detectAutoOpened, previousRange, computeChannelReport, listHistoryChannels,
   findVideosByTerm, refineChannelMeans, historyHighlights, buildDayJournal,
-  computeWatchDelays, computeSessions, computeRewatches, computeDropoff, computeUploadRhythm,
+  computeWatchDelays, computeChannelDelays, computeSessions, computeRewatches, computeDropoff,
+  computeUploadRhythm,
 } from '../lib/history.js';
 import { triageFigures } from '../lib/triage-order.js';
 import {
@@ -660,7 +661,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
  * it before. That is why the date of the last known viewing, all periods
  * together, comes with every row.
  */
-function crossSubscriptions(stats, actives, all, from, to) {
+function crossSubscriptions(stats, actives, all, from, to, uploads = []) {
   const seenInRange = new Set();
   const lastSeen = new Map();
   for (const e of all) {
@@ -679,6 +680,20 @@ function crossSubscriptions(stats, actives, all, from, to) {
 
   const candidates = stats.unsubscribedCandidates ?? [];
 
+  // How many of the subscriptions published anything over the range.
+  //
+  // "You watched 47 of your 312 channels" reads as an indictment on a range
+  // where two hundred of them published nothing at all: over seven days the
+  // honest denominator is the channels that gave you something to watch. The
+  // upload list comes from the same walk of the feed index that produced the
+  // publication dates, so this costs one pass over an array already in memory.
+  const publishing = new Set();
+  for (const u of uploads) {
+    if (u.publishedAt >= from && u.publishedAt <= to) publishing.add(u.channelId);
+  }
+  let activeInRange = 0;
+  for (const c of actives) if (publishing.has(c.id)) activeInRange++;
+
   // The two columns stay within reach of each other: twelve rows facing two
   // read as an imbalance in the account, when it is only a display ceiling hit
   // on one side. Three apart at most, and the full total stays written above
@@ -687,6 +702,11 @@ function crossSubscriptions(stats, actives, all, from, to) {
 
   return {
     total: actives.length,
+    // The feed index only knows what it has collected, so this figure cannot
+    // speak for a range older than the installation, and the screen that shows
+    // it says so.
+    activeInRange,
+    watchedInRange: actives.filter((c) => seenInRange.has(c.id)).length,
     neverWatched: never.length,
     examples: never.slice(0, ceiling),
     candidates: candidates.slice(0, ceiling),
@@ -1397,12 +1417,15 @@ route({
       streaks: streaks.map((s) => ({ ...s, avatarUrl: avatars.get(s.channelId) ?? null })),
       themes: extractThemes(inRange),
       topics: classifyTopics(inRange),
-      subscriptions: crossSubscriptions(stats, actives, all, from, to),
+      subscriptions: crossSubscriptions(stats, actives, all, from, to, uploads),
 
       // How the watching is shaped, as opposed to how much of it there is. All
       // four are computed on the same retained rows as the rest, and each says
       // on screen how many of them it could actually use.
       delays: computeWatchDelays(inRange, published, { from, to }),
+      // Who you are fast for, as opposed to how fast you are. Same rows, same
+      // publication dates, one grouping more.
+      fastest: computeChannelDelays(inRange, published, { from, to }),
       sessions: computeSessions(inRange, { from, to }),
       rewatches: computeRewatches(inRange, { from, to }),
       dropoff: computeDropoff(inRange, durations, { from, to }),

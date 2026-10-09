@@ -14,7 +14,7 @@
 import { MSG, send } from '../lib/messages.js';
 import { UI_SNAPSHOT } from '../lib/ui-snapshot.js';
 import {
-  parseWatchHistory, rangeBounds, coveredYears, formatDuration, variation,
+  parseWatchHistory, rangeBounds, coveredYears, formatDuration, formatDelay, variation,
   extractThemes, MIN_MEAN_SAMPLE, TOPIC_KEYS,
 } from '../lib/history.js';
 import { t, initLocale, getLocale, bcp47, LANG_KEY } from '../lib/i18n.js';
@@ -1329,18 +1329,6 @@ function weekdayHistogram(host, perWeekday, grid) {
  * is exact and unreadable. Past the day the unit changes, and the figure is
  * rounded: a median delay is not a measurement to the minute.
  */
-function delayLabel(ms) {
-  const hours = ms / 3_600_000;
-  if (hours < 1) return t('hist.delay.min', { n: Math.max(1, Math.round(ms / 60_000)) });
-  // Hours up to a day and a half: "30 heures après publication" says more than
-  // "1 jour", while "45 heures" past that point only makes the reader divide.
-  if (hours < 36) return t('hist.delay.hour', { n: Math.round(hours) });
-  const days = hours / 24;
-  if (days < 60) return t('hist.delay.day', { n: Math.round(days) });
-  if (days < 730) return t('hist.delay.month', { n: Math.round(days / 30.44) });
-  return t('hist.delay.year', { n: Math.round(days / 365.25) });
-}
-
 /**
  * The label of each slice of the delay chart, by the id the computation returns.
  *
@@ -1375,7 +1363,7 @@ function fillDelays(delays) {
     total: formatNumber(delays.total),
   });
 
-  $('s-delay').textContent = delayLabel(delays.median);
+  $('s-delay').textContent = formatDelay(delays.median);
   $('d-delay').textContent = t('hist.delay.on', {
     n: delays.known, v: formatNumber(delays.known),
   });
@@ -1451,7 +1439,7 @@ function fillRewatches(rewatches) {
     // said in words rather than shown as a dash.
     span.textContent = v.last - v.first < 864e5
       ? t('hist.again.sameday')
-      : delayLabel(v.last - v.first);
+      : formatDelay(v.last - v.first);
 
     tr.append(rank, title, times, span);
     return tr;
@@ -2204,7 +2192,7 @@ function channelTiming(f) {
 
   $('ch-card-delay').hidden = !f.delays?.known;
   if (f.delays?.known) {
-    $('ch-delay').textContent = delayLabel(f.delays.median);
+    $('ch-delay').textContent = formatDelay(f.delays.median);
     $('ch-delay-of').textContent = t('hist.delay.on', {
       n: f.delays.known, v: formatNumber(f.delays.known),
     });

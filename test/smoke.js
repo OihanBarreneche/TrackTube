@@ -23,6 +23,7 @@ import { accountKey, sameAccount } from '../src/lib/account.js';
 import { fr } from '../src/lib/locales/fr.js';
 import { en } from '../src/lib/locales/en.js';
 import { t, setLocale, getLocale, LOCALES } from '../src/lib/i18n.js';
+import { buildZip, crc32 } from '../src/lib/zip.js';
 import { runReverseAudit } from '../src/background/audit.js';
 import { formatReverseAuditReport } from '../src/lib/audit-format.js';
 
@@ -55,6 +56,8 @@ export async function run() {
   await testJournalDuJour(check);
   await testReverseAudit(check);
   testManiereDeRegarder(check);
+  testDelaiParChaine(check);
+  testArchiveZip(check);
   testInnertubeParse(check);
   testCompte(check);
   testScheduler(check);
@@ -2691,6 +2694,128 @@ function testCompte(check) {
     sameAccount(null, cle));
   check('compte : une observation sans clé n’est pas un refus',
     sameAccount(cle, null));
+}
+
+/**
+ * The podium of the channels one opens soonest.
+ *
+ * Three things are checked because three things can make this figure a lie: a
+ * video reopened much later must not drag its channel's median, a channel with
+ * too few dated videos must not win on a single row, and a viewing dated before
+ * its publication must be dropped rather than counted as instantaneous.
+ */
+function testDelaiParChaine(check) {
+  const at = (iso) => new Date(iso).getTime();
+  const row = (id, channel, iso) => ({
+    key: `${id}|${at(iso)}`, videoId: id, watchedAt: at(iso), title: `T ${id}`,
+    channelId: channel, channelTitle: `Chaîne ${channel.slice(-1)}`, source: 'live',
+  });
+
+  const published = new Map([
+    ['dpc0000001', at('2026-08-01T08:00:00')],
+    ['dpc0000002', at('2026-08-02T08:00:00')],
+    ['dpc0000003', at('2026-08-03T08:00:00')],
+    ['dpc0000011', at('2026-08-01T08:00:00')],
+    ['dpc0000012', at('2026-08-02T08:00:00')],
+    ['dpc0000013', at('2026-08-03T08:00:00')],
+    ['dpc0000021', at('2026-08-01T08:00:00')],
+  ]);
+
+  const fast = 'UCfast0000000000000000';
+  const slow = 'UCslow0000000000000000';
+  const rare = 'UCrare0000000000000000';
+
+  const rows = [
+    // Opened one hour after each publication, plus one of them reopened a
+    // month later: the reopening must change nothing.
+    row('dpc0000001', fast, '2026-08-01T09:00:00'),
+    row('dpc0000002', fast, '2026-08-02T09:00:00'),
+    row('dpc0000003', fast, '2026-08-03T09:00:00'),
+    row('dpc0000001', fast, '2026-09-10T09:00:00'),
+    // Opened two days after each publication.
+    row('dpc0000011', slow, '2026-08-03T08:00:00'),
+    row('dpc0000012', slow, '2026-08-04T08:00:00'),
+    row('dpc0000013', slow, '2026-08-05T08:00:00'),
+    // One single video, opened one minute after: must not reach the podium.
+    row('dpc0000021', rare, '2026-08-01T08:01:00'),
+  ];
+
+  const d = hist.computeChannelDelays(rows, published,
+    { from: at('2026-07-01T00:00:00'), to: at('2026-10-01T00:00:00') });
+
+  check('délai par chaîne : la plus rapide en tête',
+    d.channels[0]?.channelId === fast && d.channels[1]?.channelId === slow,
+    d.channels.map((c) => c.channelId).join(', '));
+  check('délai par chaîne : une chaîne d’une seule vidéo reste hors du podium',
+    !d.channels.some((c) => c.channelId === rare) && d.eligible === 2 && d.considered === 3);
+  check('délai par chaîne : une réouverture tardive ne compte pas',
+    d.channels[0]?.n === 3 && Math.round(d.channels[0].median / 3_600_000) === 1,
+    String(d.channels[0]?.median));
+
+  // A row dated before its publication is a broken row, not a record.
+  const avant = hist.computeChannelDelays(
+    [row('dpc0000001', fast, '2026-07-30T09:00:00'),
+      row('dpc0000002', fast, '2026-08-02T09:00:00'),
+      row('dpc0000003', fast, '2026-08-03T09:00:00')],
+    published, { from: at('2026-07-01T00:00:00'), to: at('2026-10-01T00:00:00'), minVideos: 2 });
+  check('délai par chaîne : un visionnage antérieur à la publication est écarté',
+    avant.channels[0]?.n === 2);
+}
+
+/**
+ * The archive the retrospective hands over.
+ *
+ * Written by hand, so what is checked is the format and not a library: the
+ * three signatures, the entry count in both places, and the offset the central
+ * directory gives for each local header. 0xCBF43926 over "123456789" is the
+ * published check value of CRC32, which is what says the table is right.
+ */
+function testArchiveZip(check) {
+  const bytes = (s) => new TextEncoder().encode(s);
+
+  check('zip : la valeur de contrôle de CRC32',
+    crc32(bytes('123456789')) === 0xCBF43926,
+    crc32(bytes('123456789')).toString(16));
+
+  const files = [
+    { name: 'un.png', data: bytes('premier') },
+    { name: 'deux.png', data: bytes('second contenu') },
+  ];
+  const zip = buildZip(files, { date: new Date('2026-10-09T12:00:00') });
+  const view = new DataView(zip.buffer);
+
+  check('zip : commence par un en tête local', view.getUint32(0, true) === 0x04034B50);
+
+  const eocd = zip.length - 22;
+  check('zip : se termine par un EOCD', view.getUint32(eocd, true) === 0x06054B50);
+  check('zip : deux entrées annoncées',
+    view.getUint16(eocd + 8, true) === 2 && view.getUint16(eocd + 10, true) === 2);
+
+  const centralAt = view.getUint32(eocd + 16, true);
+  check('zip : le répertoire central est là où l’EOCD le dit',
+    view.getUint32(centralAt, true) === 0x02014B50);
+  check('zip : la taille du répertoire central est juste',
+    view.getUint32(eocd + 12, true) === eocd - centralAt);
+
+  // The first entry's local header, as the central directory points at it.
+  const offset = view.getUint32(centralAt + 42, true);
+  check('zip : le décalage mène bien à l’en tête local',
+    offset === 0 && view.getUint32(offset, true) === 0x04034B50);
+  check('zip : stocké sans compression, tailles égales',
+    view.getUint16(offset + 8, true) === 0
+    && view.getUint32(offset + 18, true) === 7
+    && view.getUint32(offset + 22, true) === 7);
+  check('zip : le nom est écrit après l’en tête',
+    new TextDecoder().decode(zip.slice(30, 36)) === 'un.png');
+  check('zip : le CRC de la première entrée',
+    view.getUint32(offset + 14, true) === crc32(bytes('premier')));
+
+  // A name outside ASCII is measured in bytes, which is the one mistake that
+  // silently corrupts an archive.
+  const accentue = buildZip([{ name: 'rétro.png', data: bytes('x') }]);
+  const vue = new DataView(accentue.buffer);
+  check('zip : la longueur d’un nom accentué est comptée en octets',
+    vue.getUint16(26, true) === new TextEncoder().encode('rétro.png').length);
 }
 
 function testInnertubeParse(check) {

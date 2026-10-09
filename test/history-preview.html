@@ -33,7 +33,8 @@
       parseWatchHistory, computeStats, computeChannelStreaks, extractThemes,
       classifyTopics, detectAutoOpened, previousRange,
       computeChannelReport, listHistoryChannels, findVideosByTerm, refineChannelMeans,
-      computeWatchDelays, computeSessions, computeRewatches, computeDropoff, computeUploadRhythm,
+      computeWatchDelays, computeChannelDelays, computeSessions, computeRewatches,
+      computeDropoff, computeUploadRhythm,
     } from '../src/lib/history.js';
 
     const banc = document.getElementById('banc');
@@ -278,6 +279,16 @@
               topics: classifyTopics(dansPlage),
               subscriptions: {
                 total: actifs.length,
+                // As the worker computes them: the channels watched over the
+                // range, and those that published anything over it, which is
+                // the denominator the retrospective's screen needs.
+                watchedInRange: actifs.filter((c) => vuesPlage.has(c.id)).length,
+                activeInRange: (() => {
+                  const publiant = new Set(uploadRows
+                    .filter((u) => u.publishedAt >= from && u.publishedAt <= to)
+                    .map((u) => u.channelId));
+                  return actifs.filter((c) => publiant.has(c.id)).length;
+                })(),
                 neverWatched: actifs.filter((c) => !vuesPlage.has(c.id)).length,
                 examples: actifs.filter((c) => !vuesPlage.has(c.id)).slice(0, 12)
                   .map((c) => ({ channelId: c.id, title: c.title, lastSeen: null })),
@@ -285,6 +296,7 @@
               },
               enriched: uploads.size,
               delays: computeWatchDelays(dansPlage, published, { from, to }),
+              fastest: computeChannelDelays(dansPlage, published, { from, to }),
               sessions: computeSessions(dansPlage, { from, to }),
               rewatches: computeRewatches(dansPlage, { from, to }),
               dropoff: computeDropoff(dansPlage, durations, { from, to }),
