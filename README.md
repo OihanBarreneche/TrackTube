@@ -15,31 +15,25 @@ your browser.
 
 ## Why
 
-YouTube's Subscriptions page does show the most recent videos, and it shows them
-in the right order. There is nothing strange about the order. The problem is
-what sits above it.
-
-The two sections that open the page, and that take the whole screen on the way
-in, are a carousel of what YouTube judges most relevant and a carousel of
-Shorts. Both are recommendations. The chronological list of the channels you
-actually subscribed to begins under them, once you have scrolled past.
+The Subscriptions page opens on two sections that take the whole screen: a
+carousel of what YouTube judges most relevant, and a carousel of Shorts. Both
+are recommendations. The chronological list of the channels you actually
+subscribed to begins under them, once you have scrolled past.
 
 And that list is not always complete. A video from a channel you follow
 sometimes never appears at all, and sometimes appears days late.
 
-The direction of travel is the rest of the answer. At Made on YouTube in
-September 2026, YouTube announced
+At Made on YouTube in September 2026, YouTube announced
 [Custom Feeds](https://techcrunch.com/2026/09/23/youtube-will-let-you-build-your-own-algorithm-with-ai/):
 you describe in your own words the videos you would like recommended, Gemini
-builds the feed, and it gets a tab of its own next to Home. Nothing comparable
-was announced for the subscription list.
+builds the feed, and it gets a tab of its own next to Home. That is where things
+are heading, and not only at YouTube: outside a handful of purists, hardly
+anyone opens the subscriptions tab any more.
 
-That list used to be the whole point. You subscribed to the people you wanted to
-support, and refreshing the page each day told you which of them had posted
-something new. That is what a subscription was for, and it is what is quietly
-going away.
+It used to be the whole point. You subscribed to the people you wanted to
+support, and refreshing the page told you which of them had posted something.
 
-TrackTube rebuilds the list from each channel's own public feed, one channel at
+TrackTube rebuilds that list from each channel's own public feed, one channel at
 a time, and shows it in place of YouTube's. Nothing is filtered unless you asked
 for it.
 
@@ -49,19 +43,14 @@ for it.
 
 ### A feed that empties
 
-YouTube has a hide of its own. What is wrong with it is not that it is missing,
-it is that it is impractical: the tile turns grey and stays exactly where it
-was, so hiding twenty videos in a row means aiming at a page that never changes
-shape. Here the card leaves the grid as you click, which is what makes hiding in
-a chain possible, and a selection mode does it by the batch.
+Hide a video and the card leaves the grid as you click, so you can hide in a
+chain, and a selection mode does it by the batch. YouTube's own hide greys the
+tile and leaves it where it was.
 
-The other half of the problem is not visual. A hidden video is still fetched and
-drawn; on a page where nearly everything is hidden and ten videos are kept,
-which is what a month looks like once you use the feed as a list of things to
-watch, every month makes the page slower. Here hiding is filtered inside the
-database index itself: a hidden video is never read, never deserialised, never
-rendered. The cost of hiding is constant, and the feed opens as fast with forty
-thousand videos hidden as with ten.
+A hidden video there is also still loaded and drawn, so the page slows down as
+hidden videos pile up. Here hiding is filtered inside the database index: a
+hidden video is never read, never deserialised, never rendered, so the cost
+stays the same whether you have hidden ten videos or forty thousand.
 
 That is the use TrackTube is built around. The feed is a list of videos to
 watch, that you empty: the moment you know you will not watch something, or you
@@ -79,7 +68,7 @@ set.
 
 ### A popup that tells you where things stand
 
-<img src="screenshots/popup.png" alt="The popup" width="400">
+![The popup](screenshots/popup.png)
 
 One switch turns the takeover of the Subscriptions page off and back on, so
 YouTube's own page comes back untouched whenever you want it.

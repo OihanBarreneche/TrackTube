@@ -15,32 +15,26 @@ abonné. Tout reste dans ton navigateur.
 
 ## Pourquoi
 
-La page Abonnements de YouTube affiche bien les vidéos les plus récentes, et
-elle les affiche dans le bon ordre. Il n'y a rien d'étrange dans cet ordre. Le
-problème est ce qui se trouve au dessus.
-
-Les deux sections qui ouvrent la page, et qui prennent tout l'écran à l'arrivée,
-sont un carrousel de ce que YouTube juge le plus pertinent et un carrousel de
-Shorts. Les deux sont de la recommandation. La liste chronologique des chaînes
+La page Abonnements ouvre sur deux sections qui prennent tout l'écran : un
+carrousel de ce que YouTube juge le plus pertinent, et un carrousel de Shorts.
+Les deux sont de la recommandation. La liste chronologique des chaînes
 auxquelles tu t'es réellement abonné commence en dessous, une fois que tu les as
 dépassées.
 
 Et cette liste n'est pas toujours complète. Une vidéo d'une chaîne que tu suis
 n'apparaît parfois jamais, et apparaît parfois plusieurs jours en retard.
 
-La direction prise est le reste de la réponse. Au Made on YouTube de septembre
-2026, YouTube a annoncé les
+Au Made on YouTube de septembre 2026, YouTube a annoncé les
 [Custom Feeds](https://techcrunch.com/2026/09/23/youtube-will-let-you-build-your-own-algorithm-with-ai/) :
 tu décris avec tes mots les vidéos que tu voudrais voir recommandées, Gemini
-construit le feed, et il reçoit un onglet à lui à côté d'Accueil. Rien
-d'équivalent n'a été annoncé pour la liste d'abonnements.
+construit le feed, et il reçoit un onglet à lui à côté d'Accueil. C'est la
+tendance, et elle n'est pas que du côté de YouTube : en dehors de quelques
+puristes, plus grand monde n'ouvre l'onglet Abonnements.
 
-Cette liste était pourtant tout l'intérêt. On s'abonnait aux gens qu'on voulait
-soutenir, et rafraîchir la page chaque jour disait lesquels d'entre eux avaient
-posté quelque chose. C'est à ça que servait un abonnement, et c'est ce qui
-disparaît doucement.
+C'était pourtant tout l'intérêt. On s'abonnait aux gens qu'on voulait soutenir,
+et rafraîchir la page disait lesquels d'entre eux avaient posté quelque chose.
 
-TrackTube reconstruit la liste depuis le flux public de chaque chaîne, une
+TrackTube reconstruit cette liste depuis le flux public de chaque chaîne, une
 chaîne après l'autre, et l'affiche à la place de celle de YouTube. Rien n'est
 filtré sans que tu l'aies demandé.
 
@@ -50,21 +44,15 @@ filtré sans que tu l'aies demandé.
 
 ### Un feed qui se vide
 
-YouTube a son propre masquage. Ce qui ne va pas, ce n'est pas qu'il manque,
-c'est qu'il est peu pratique : la vignette devient grise et reste exactement où
-elle était, donc masquer vingt vidéos d'affilée revient à viser dans une page
-qui ne change jamais de forme. Ici la carte quitte la grille au moment du clic,
-ce qui rend le masquage à la chaîne possible, et un mode sélection le fait par
-lots.
+Masque une vidéo et la carte quitte la grille au moment du clic, donc tu peux
+masquer à la chaîne, et un mode sélection le fait par lots. Le masquage de
+YouTube, lui, grise la vignette et la laisse où elle était.
 
-L'autre moitié du problème n'est pas visuelle. Une vidéo masquée est quand même
-chargée et dessinée ; sur une page où presque tout est masqué et où une dizaine
-de vidéos sont conservées, ce à quoi ressemble un mois dès qu'on se sert du feed
-comme d'une liste à regarder, chaque mois rend la page plus lente. Ici le
-masquage est filtré à l'intérieur de l'index de la base : une vidéo masquée
-n'est jamais lue, jamais désérialisée, jamais dessinée. Le coût du masquage est
-constant, et le feed s'ouvre aussi vite avec quarante mille vidéos masquées
-qu'avec dix.
+Une vidéo masquée y est aussi chargée et dessinée quand même, donc la page
+ralentit à mesure que les vidéos masquées s'accumulent. Ici le masquage est
+filtré à l'intérieur de l'index de la base : une vidéo masquée n'est jamais lue,
+jamais désérialisée, jamais dessinée, donc le coût reste le même que tu en aies
+masqué dix ou quarante mille.
 
 C'est l'usage autour duquel TrackTube est construit. Le feed est une liste de
 vidéos à voir, que tu vides : dès que tu sais que tu ne regarderas pas quelque
@@ -82,7 +70,7 @@ régler.
 
 ### Une popup qui dit où en sont les choses
 
-<img src="screenshots/popup.png" alt="La popup" width="400">
+![La popup](screenshots/popup.png)
 
 Un interrupteur désactive et réactive la reprise de la page Abonnements, donc la
 page de YouTube revient intacte dès que tu la veux.
