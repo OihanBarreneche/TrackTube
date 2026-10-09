@@ -76,11 +76,14 @@
 
     <path d="M583 372h394" stroke="#302a48"/>
     <image href="thumbnails/city.jpg" x="583" y="388" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-3)"/>
+    <g clip-path="url(#thumb-3)">
+      <rect x="583" y="455" width="112" height="3" fill="#ffffff" fill-opacity=".45"/>
+      <rect x="583" y="455" width="43" height="3" fill="#a68cff"/>
+    </g>
     <circle cx="680" cy="403" r="11" fill="#11101f" fill-opacity=".82"/>
     <path d="M675 398l10 10m0-10l-10 10" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
     <text x="711" y="418" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Keep watching</text>
-    <rect x="711" y="440" width="234" height="5" rx="2.5" fill="#403956"/>
-    <rect x="711" y="440" width="89" height="5" rx="2.5" fill="#a68cff"/>
+    <text x="711" y="442" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">Pick up where you left off</text>
   </g>
   </g>
 
