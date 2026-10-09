@@ -422,8 +422,9 @@
             + '#view-global > :not([data-shot-keep]) { display: none !important }'
             + '#results { margin: 0 }'
             // The synthetic fixture has no meaningful preceding period; its
-            // enormous relative deltas would misrepresent a real account.
-            + (shot === 'store' ? '#figures .delta { display: none !important }' : ''),
+            // enormous relative deltas would misrepresent a real account in
+            // either the README or Store screenshot.
+            + '#figures .delta { display: none !important }',
         }));
 
         // The card ends at its charts: the sittings and the summary line below

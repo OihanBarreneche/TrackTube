@@ -2,7 +2,7 @@
 
 [English](README.md) · **Français**
 
-![TrackTube : fil des abonnements, filtrage des Shorts, historique et tri carte par carte](store-assets/marquee.png)
+![TrackTube : fil des abonnements, filtrage des Shorts, historique et tri des abonnements](store-assets/marquee.fr.png)
 
 **Tes abonnements YouTube, dans l'ordre, avec filtrage des Shorts.**
 
@@ -45,7 +45,7 @@ filtré sans que tu l'aies demandé.
 
 ### Un feed qui se vide
 
-![Le feed, dans YouTube](screenshots/feed.jpg)
+![Le feed, dans YouTube](screenshots/feed-fr.jpg)
 
 Masque une vidéo et la carte quitte la grille au moment du clic, donc tu peux
 masquer à la chaîne, et un mode sélection le fait par lots. Le masquage de
@@ -73,7 +73,7 @@ régler.
 
 ### Une popup qui dit où en sont les choses
 
-![La popup](screenshots/popup.png)
+![La popup](screenshots/popup-fr.png)
 
 Un interrupteur désactive et réactive la reprise de la page Abonnements, donc la
 page de YouTube revient intacte dès que tu la veux.
@@ -87,7 +87,7 @@ carte par carte.
 
 ### Une analyse de ce que tu regardes vraiment
 
-![L'analyse de l'historique](screenshots/history.png)
+![L'analyse de l'historique](screenshots/history-fr.png)
 
 Le temps passé sur n'importe quelle plage, par chaîne et par jour. Les chaînes
 que tu ne manques jamais, et la longueur de ta série sur chacune. Le délai entre
@@ -130,7 +130,7 @@ Trois petits jeux sont construits sur les mêmes données :
 
 ### Un tri de tes abonnements, carte par carte
 
-![Le tri des abonnements](screenshots/triage.jpg)
+![Le tri des abonnements](screenshots/triage-fr.jpg)
 
 Le geste est celui des applications de rencontre, et c'est volontaire : une
 chaîne par carte, à droite pour garder, à gauche pour se désabonner, et rien à
@@ -254,9 +254,10 @@ Renseigne `TRACKTUBE_PLAYWRIGHT_PATH` et `TRACKTUBE_BROWSER_PATH` s'ils viennent
 d'en dehors du projet. `node tools/diagnose-videos.mjs ID_VIDEO` inspecte les
 métadonnées publiques d'une vidéo sans cookies.
 
-`python tools/shoot.py` reconstruit les captures de ce README en pilotant un
-Chrome sans fenêtre sur les bancs. Il a besoin du réseau la première fois : les
-captures du feed et du tri utilisent de vraies vidéos lues dans les flux publics
+`python tools/shoot.py --lang fr feed history triage popup` reconstruit les
+captures de ce README en pilotant un Chrome sans fenêtre sur les bancs. Il a
+besoin du réseau la première fois : les captures du feed et du tri utilisent de
+vraies vidéos lues dans les flux publics
 de YouTube, et il met les avatars des chaînes en cache localement pour qu'une
 capture ne leur course pas après.
 

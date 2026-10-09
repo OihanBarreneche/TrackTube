@@ -8,12 +8,14 @@ Chrome so the same command gives the same pixels on any machine.
 It uses its own throwaway profile and never touches an installed one. The feed
 shot fetches real thumbnails from `i.ytimg.com`, so that one needs the network.
 
-    python tools/shoot.py            every shot
-    python tools/shoot.py feed       just one
+    python tools/shoot.py                  every English shot
+    python tools/shoot.py feed             one English shot
+    python tools/shoot.py --lang fr feed   one French shot, saved as feed-fr.jpg
 
 Pillow does the cropping; Chrome is looked for where Windows and Linux put it.
 """
 from pathlib import Path
+import argparse
 import json
 import shutil
 import socket
@@ -118,8 +120,9 @@ def serve(port):
     return None
 
 
-def shoot(chrome, port, name):
+def shoot(chrome, port, name, lang):
     url_path, (width, height), box, fmt = SHOTS[name]
+    url_path = url_path.replace('lang=en', 'lang=' + lang)
     url = 'http://127.0.0.1:%d/%s' % (port, url_path)
     with tempfile.TemporaryDirectory() as profile:
         raw = Path(profile) / 'shot.png'
@@ -143,7 +146,8 @@ def shoot(chrome, port, name):
         if box:
             image = image.crop(box)
         image = image.convert('RGB')
-        target = OUT / ('%s.%s' % (name, fmt))
+        suffix = '' if lang == 'en' else '-' + lang
+        target = OUT / ('%s%s.%s' % (name, suffix, fmt))
         if fmt == 'jpg':
             image.save(target, quality=90, optimize=True, subsampling=0)
         else:
@@ -152,7 +156,11 @@ def shoot(chrome, port, name):
 
 
 def main():
-    wanted = sys.argv[1:] or list(SHOTS)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--lang', choices=('en', 'fr'), default='en')
+    parser.add_argument('shots', nargs='*')
+    args = parser.parse_args()
+    wanted = args.shots or list(SHOTS)
     for name in wanted:
         if name not in SHOTS:
             raise SystemExit('Unknown shot %r; known: %s' % (name, ', '.join(SHOTS)))
@@ -164,7 +172,7 @@ def main():
     try:
         time.sleep(1.5)
         for name in wanted:
-            shoot(chrome, port, name)
+            shoot(chrome, port, name, args.lang)
     finally:
         if proc:
             proc.terminate()
