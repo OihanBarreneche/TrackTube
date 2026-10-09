@@ -44,6 +44,7 @@
   <text x="197.5" y="474" text-anchor="middle" fill="#e6dcff" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing=".5">NO RECOMMENDATIONS</text>
 
   <!-- An illustrative feed, drawn with the same dark cards and purple accents. -->
+  <g transform="translate(0 20)">
   <g filter="url(#shadow)"><rect x="550" y="42" width="460" height="436" rx="27" fill="#11101f" stroke="#514379" stroke-width="2"/></g>
   <g clip-path="url(#feed-clip)">
     <rect x="550" y="42" width="460" height="76" fill="#17142b"/>
@@ -81,6 +82,7 @@
     <rect x="711" y="440" width="234" height="5" rx="2.5" fill="#403956"/>
     <rect x="711" y="440" width="89" height="5" rx="2.5" fill="#a68cff"/>
   </g>
+  </g>
 
   <!-- Three compact companion cards: filtering, analysis, channel review. -->
   <g filter="url(#shadow)"><rect x="1078" y="63" width="230" height="112" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
@@ -107,6 +109,8 @@
     <rect x="1241" y="443" width="14" height="28" rx="4" fill="#7067a5"/>
     <rect x="1259" y="447" width="14" height="24" rx="4" fill="#7aaf9e"/>
   </g>
-  <path d="M1084 496h-22m0 0 8-7m-8 7 8 7" fill="none" stroke="#ff7d8e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M1300 496h24m0 0-8-7m8 7-8 7" fill="none" stroke="#8cddb9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="1068" cy="454" r="15" fill="#3b2635" stroke="#ff7d8e" stroke-width="1.5"/>
+  <path d="M1062 448l12 12m0-12l-12 12" fill="none" stroke="#ff7d8e" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="1318" cy="454" r="15" fill="#233a39" stroke="#8cddb9" stroke-width="1.5"/>
+  <path d="M1310 454l5 5 11-12" fill="none" stroke="#8cddb9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
