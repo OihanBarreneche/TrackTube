@@ -2,12 +2,13 @@
 
 [English](README.md) · **Français**
 
-**Tes abonnements YouTube, dans l'ordre, sans Shorts.**
+**Tes abonnements YouTube, dans l'ordre, avec filtrage des Shorts.**
 
-TrackTube remplace la page Abonnements de YouTube par la liste chronologique
-complète de ce qu'ont publié les chaînes que tu suis. Pas de recommandations,
-pas de Shorts, et pas de vidéo manquante d'une chaîne à laquelle tu es pourtant
-abonné. Tout reste dans ton navigateur.
+TrackTube remplace la page Abonnements de YouTube par un fil chronologique
+collecté chaîne par chaîne. Il retire les recommandations, filtre les Shorts
+identifiés et permet d'actualiser les publications récentes pour rattraper des
+manques. YouTube peut retarder ou cacher des publications et la classification
+des Shorts ; la couverture n'est donc pas absolue. Tout reste dans ton navigateur.
 
 ![Le feed, dans YouTube](screenshots/feed.jpg)
 

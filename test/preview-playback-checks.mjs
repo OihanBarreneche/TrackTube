@@ -44,8 +44,10 @@ export async function checkPreview(page, origin, output) {
   check('No embedded or native API player is created', await page.locator('.tracktube-card iframe, .tracktube-card ytd-player').count() === 0);
   if (output) await page.screenshot({path:output});
   for (const i of [1, 2]) {
-    await thumb(i).hover(); await waitPlaying(i); await waitAudible(i);
+    await thumb(i).hover(); await waitPlaying(i);
     check(`First-row card ${i+1} has available sound`, await sound(i).isVisible() && await sound(i).isEnabled());
+    check(`First-row card ${i+1} starts muted`, await video(i).evaluate(v => v.muted));
+    await sound(i).click(); await waitAudible(i);
   }
   check('Leaving a card stops and unloads its media', await page.evaluate(() => {
     const old = window.previewBench.players[0].video;

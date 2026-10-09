@@ -1,6 +1,6 @@
-# Known limits — 1.0.0
+# Known limits — 1.1.0
 
-Updated October 8, 2026. What follows is what TrackTube does not promise, and
+Updated October 9, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
 they name, and YouTube owes nobody stability on any of them.
 

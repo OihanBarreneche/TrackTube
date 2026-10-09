@@ -12,7 +12,7 @@ Here it is the point of view of whoever modifies it.
 
 ## Current state
 
-Version 1.0.0, audited in October 2026 for a first public release: the README is
+Version 1.1.0, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are down to `storage`,
 `unlimitedStorage`, `alarms` and `https://www.youtube.com/*`, and the welcome
 flow is three steps rather than six.

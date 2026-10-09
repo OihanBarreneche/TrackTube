@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="280" viewBox="0 0 440 280">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111022"/>
+      <stop offset="1" stop-color="#21184b"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#b59bff"/>
+      <stop offset="1" stop-color="#7059f5"/>
+    </linearGradient>
+  </defs>
+  <rect width="440" height="280" fill="url(#bg)"/>
+  <circle cx="363" cy="61" r="104" fill="#5944d6" opacity=".12"/>
+  <circle cx="395" cy="260" r="119" fill="#a489ff" opacity=".08"/>
+  <rect x="25" y="42" width="94" height="94" rx="23" fill="#10101c"/>
+  <circle cx="72" cy="89" r="33" fill="none" stroke="#302a51" stroke-width="11"/>
+  <path d="M43 96a33 33 0 1 0 12-33" fill="none" stroke="url(#ring)" stroke-width="11" stroke-linecap="round"/>
+  <path d="M65 72v34l28-17z" fill="#f9f8ff"/>
+  <text x="140" y="100" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="35" font-weight="700" letter-spacing="-1">TrackTube</text>
+  <text x="27" y="184" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600">Vos abonnements YouTube,</text>
+  <text x="27" y="216" fill="#cdbdff" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="600">dans l'ordre.</text>
+  <path d="M27 239h386" stroke="#675799" opacity=".45"/>
+  <text x="27" y="261" fill="#b7b0d2" font-family="Arial, Helvetica, sans-serif" font-size="12" letter-spacing=".5">FIL CHRONOLOGIQUE  ·  SANS RECOMMANDATIONS</text>
+</svg>

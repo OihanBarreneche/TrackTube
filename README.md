@@ -2,12 +2,13 @@
 
 **English** · [Français](README.fr.md)
 
-**Your YouTube subscriptions, in order, without Shorts.**
+**Your YouTube subscriptions, in order, with Shorts filtering.**
 
-TrackTube replaces YouTube's Subscriptions page with the full chronological list
-of what the channels you follow have published. No recommendations, no Shorts,
-and no video missing from a channel you are subscribed to. Everything stays in
-your browser.
+TrackTube replaces YouTube's Subscriptions page with a chronological feed
+collected channel by channel. It removes recommendations, filters identified
+Shorts, and lets you refresh recent uploads to catch gaps. YouTube can delay or
+withhold publications and Shorts classifications, so coverage is not absolute.
+Everything stays in your browser.
 
 ![The feed, inside YouTube](screenshots/feed.jpg)
 
