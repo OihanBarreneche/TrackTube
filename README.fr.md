@@ -5,9 +5,9 @@
 **Tes abonnements YouTube, dans l'ordre, sans Shorts.**
 
 TrackTube remplace la page Abonnements de YouTube par la liste chronologique
-complète de ce qu'ont publié les chaînes que tu suis. Pas de classement, pas de
-recommandations, pas de carrousel de Shorts au milieu de la liste. Tout reste
-dans ton navigateur.
+complète de ce qu'ont publié les chaînes que tu suis. Pas de recommandations,
+pas de Shorts, et pas de vidéo manquante d'une chaîne à laquelle tu es pourtant
+abonné. Tout reste dans ton navigateur.
 
 ![Le feed, dans YouTube](screenshots/feed.jpg)
 
@@ -15,68 +15,148 @@ dans ton navigateur.
 
 ## Pourquoi
 
-La page Abonnements de YouTube a cessé d'être une liste. Elle ouvre sur un bloc
-« Pour vous », une rangée de directs, et les carrousels de Shorts reviennent
-entre les lignes. Ce à quoi tu t'es abonné est là dedans quelque part, dans un
-ordre que personne ne sait expliquer, et une vidéo qui n'est jamais arrivée sur
-la page ne se distingue pas d'une vidéo qui n'a jamais été publiée.
+La page Abonnements de YouTube affiche bien les vidéos les plus récentes, et
+elle les affiche dans le bon ordre. Il n'y a rien d'étrange dans cet ordre. Le
+problème est ce qui se trouve au dessus.
 
-TrackTube reconstruit cette liste depuis le flux public de chaque chaîne, une
+Les deux sections qui ouvrent la page, et qui prennent tout l'écran à l'arrivée,
+sont un carrousel de ce que YouTube juge le plus pertinent et un carrousel de
+Shorts. Les deux sont de la recommandation. La liste chronologique des chaînes
+auxquelles tu t'es réellement abonné commence en dessous, une fois que tu les as
+dépassées.
+
+Et cette liste n'est pas toujours complète. Une vidéo d'une chaîne que tu suis
+n'apparaît parfois jamais, et apparaît parfois plusieurs jours en retard.
+
+La direction prise est le reste de la réponse. Au Made on YouTube de septembre
+2026, YouTube a annoncé les
+[Custom Feeds](https://techcrunch.com/2026/09/23/youtube-will-let-you-build-your-own-algorithm-with-ai/) :
+tu décris avec tes mots les vidéos que tu voudrais voir recommandées, Gemini
+construit le feed, et il reçoit un onglet à lui à côté d'Accueil. Rien
+d'équivalent n'a été annoncé pour la liste d'abonnements.
+
+Cette liste était pourtant tout l'intérêt. On s'abonnait aux gens qu'on voulait
+soutenir, et rafraîchir la page chaque jour disait lesquels d'entre eux avaient
+posté quelque chose. C'est à ça que servait un abonnement, et c'est ce qui
+disparaît doucement.
+
+TrackTube reconstruit la liste depuis le flux public de chaque chaîne, une
 chaîne après l'autre, et l'affiche à la place de celle de YouTube. Rien n'est
 filtré sans que tu l'aies demandé.
+
+---
 
 ## Ce que tu obtiens
 
 ### Un feed qui se vide
 
-Masque une vidéo et elle s'en va pour de bon. Contrairement au « Ça ne
-m'intéresse pas » de YouTube, une vidéo masquée ici n'est jamais chargée, jamais
-lue, jamais dessinée : en masquer des milliers ne coûte rien. Mets une étoile
-sur celles que tu comptes regarder, elles ont leur propre vue. Lance une vidéo,
-reviens le lendemain, elle est toujours dans **En cours** avec la barre de
-progression là où tu l'avais laissée.
+YouTube a son propre masquage. Ce qui ne va pas, ce n'est pas qu'il manque,
+c'est qu'il est peu pratique : la vignette devient grise et reste exactement où
+elle était, donc masquer vingt vidéos d'affilée revient à viser dans une page
+qui ne change jamais de forme. Ici la carte quitte la grille au moment du clic,
+ce qui rend le masquage à la chaîne possible, et un mode sélection le fait par
+lots.
 
-Survoler une vignette lance la vidéo sur place, muette, avec un bouton de son si
-tu en veux. La recherche couvre tous les titres et toutes les chaînes que
-l'extension connaît, sans passer par la recherche de YouTube.
+L'autre moitié du problème n'est pas visuelle. Une vidéo masquée est quand même
+chargée et dessinée ; sur une page où presque tout est masqué et où une dizaine
+de vidéos sont conservées, ce à quoi ressemble un mois dès qu'on se sert du feed
+comme d'une liste à regarder, chaque mois rend la page plus lente. Ici le
+masquage est filtré à l'intérieur de l'index de la base : une vidéo masquée
+n'est jamais lue, jamais désérialisée, jamais dessinée. Le coût du masquage est
+constant, et le feed s'ouvre aussi vite avec quarante mille vidéos masquées
+qu'avec dix.
 
-### Une analyse de ce que tu regardes vraiment
+C'est l'usage autour duquel TrackTube est construit. Le feed est une liste de
+vidéos à voir, que tu vides : dès que tu sais que tu ne regarderas pas quelque
+chose, ou que tu l'as déjà vu, ça part.
 
-![L'analyse de l'historique](screenshots/history.png)
+**Les étoiles** servent dans l'autre sens. Sur un lot de vingt nouveautés,
+étoile les deux que tu comptes vraiment regarder pour qu'elles ne se perdent pas
+dans le reste, et elles ont en plus une vue à elles.
 
-Le temps passé, les chaînes que tu ne manques jamais, le délai que tu mets avant
-d'ouvrir une vidéo, l'endroit où tu décroches, les sujets qui reviennent dans
-les titres, le moment de la journée où tu regardes. L'extension mesure ce que tu
-regardes à partir du moment où tu l'actives, et un export Google Takeout comble
-les années d'avant.
-
-Chaque chiffre dit sur quoi il repose. Un total calculé sur 590 visionnages datés
-sur 876 le dit à l'écran ; un chiffre qui ne serait qu'une supposition affiche un
-tiret à la place. Trois petits jeux sont construits sur les mêmes données : une
-rétrospective de l'année, un duel et un tournoi à élimination entre tes propres
-chaînes.
-
-### Un tri des abonnements, carte par carte
-
-![Le tri des abonnements](screenshots/triage.jpg)
-
-Une liste d'abonnements grossit pendant des années. Celle ci se parcourt une
-chaîne à la fois, avec ses dernières vidéos, la fréquence à laquelle elle
-publie, la date de sa dernière publication et la part que tu en as réellement
-regardée. À droite pour garder, à gauche pour se désabonner. Les chaînes qui ont
-cessé de publier passent en premier.
-
-Se désabonner désabonne pour de vrai, alors une décision ne part que cinq cartes
-plus tard : assez loin pour changer d'avis, assez près pour que rien n'attende
-la fin.
+**En cours** dit quelles vidéos tu as déjà commencées et te laisse en reprendre
+une là où tu l'avais laissée, depuis sa propre vue. Et si tu veux que la liste
+se vide d'elle même, tu peux activer le masquage automatique d'une vidéo une
+fois que tu l'as vue, la part de la vidéo qui compte comme vue étant à toi de
+régler.
 
 ### Une popup qui dit où en sont les choses
 
 <img src="screenshots/popup.png" alt="La popup" width="400">
 
-Ce qui est arrivé dans le dernier jour, la dernière semaine et le dernier mois,
-ce qui est en priorité, ce qui est en cours, combien est masqué, et quand la
-dernière collecte a tourné.
+Un interrupteur désactive et réactive la reprise de la page Abonnements, donc la
+page de YouTube revient intacte dès que tu la veux.
+
+En dessous, les chiffres qui méritent un coup d'œil : ce qui est arrivé dans le
+dernier jour, la dernière semaine et le dernier mois, ce qui est en priorité, ce
+qui est en cours, combien est masqué, et quand la dernière collecte a tourné.
+Puis les deux portes vers le reste de l'extension, qui sont les deux sections
+suivantes ici : l'analyse de ce que tu regardes, et le tri de tes abonnements
+carte par carte.
+
+### Une analyse de ce que tu regardes vraiment
+
+![L'analyse de l'historique](screenshots/history.png)
+
+Le temps passé sur n'importe quelle plage, par chaîne et par jour. Les chaînes
+que tu ne manques jamais, et la longueur de ta série sur chacune. Le délai entre
+une publication et le moment où tu l'as ouverte. L'endroit où tu arrêtes de
+regarder. Ce que tu reviens voir, et combien de fois. Les sujets qui reviennent
+dans les titres, et une classification plus large par thème. L'heure de la
+journée et le jour de la semaine où tu regardes. Tes séances, c'est à dire les
+visionnages regroupés d'une traite, et leur durée. La fréquence de publication
+d'une chaîne. Et un journal jour par jour qui montre les lignes d'une journée
+exactement comme elles sont stockées, ce qui en fait le premier endroit où
+regarder quand un chiffre ailleurs paraît faux.
+
+Trois sources l'alimentent, et elle dit toujours laquelle. Un export Google
+Takeout couvre les années d'avant toute installation. La page d'historique de
+YouTube peut être lue pour les années qu'un export n'atteint pas. Et si tu
+actives le relevé, l'extension mesure tes visionnages elle même, **plus
+finement que l'historique de YouTube** : YouTube enregistre que tu as ouvert une
+vidéo, l'extension enregistre quand, pendant combien de temps, et jusqu'où tu
+es allé.
+
+Chaque chiffre dit sur quoi il repose. Un total calculé sur 590 visionnages
+datés sur 876 le dit à l'écran ; un chiffre qui ne serait qu'une supposition
+affiche un tiret à la place.
+
+Trois petits jeux sont construits sur les mêmes données :
+
+- **La rétrospective** transforme une année, ou n'importe quelle plage que tu
+  choisis, en six cartes plein écran : les heures passées, le podium de tes
+  chaînes par nombre de vidéos et par temps passé, ton heure de pointe et ton
+  jour record, les mots qui reviennent dans les titres, et ta plus longue série
+  ininterrompue sur une seule chaîne. Chaque carte s'exporte en image.
+- **Le duel** met deux de tes chaînes côte à côte et te demande de parier sur
+  celle que tu as le plus regardée, avant que les chiffres apparaissent. Tu
+  crois connaître ta propre consommation ; se tromper deux fois sur trois en dit
+  plus qu'un classement bien rangé.
+- **Le tournoi** est un arbre à élimination directe entre tes chaînes où aucun
+  chiffre n'est montré pendant les duels, donc tu votes pour la chaîne que tu
+  garderais et non pour celle que tu as le plus regardée. Les deux classements ne
+  coïncident pas, et c'est tout l'intérêt.
+
+### Un tri de tes abonnements, carte par carte
+
+![Le tri des abonnements](screenshots/triage.jpg)
+
+Le geste est celui des applications de rencontre, et c'est volontaire : une
+chaîne par carte, à droite pour garder, à gauche pour se désabonner, et rien à
+lire avant de décider. Chaque carte porte les dernières vidéos de la chaîne, la
+fréquence à laquelle elle publie, la date de sa dernière publication et la part
+que tu en as réellement regardée. Les chaînes qui ont cessé de publier passent
+en premier.
+
+Une liste d'abonnements grossit pendant des années et personne ne la taille
+jamais. La reprendre de temps en temps vaut la demi heure, et ce n'est pas que
+du rangement : une bonne moitié des cartes sont des chaînes auxquelles tu t'es
+abonné il y a huit ans et que tu avais oubliées, ce qui se révèle être le
+meilleur moment.
+
+Se désabonner désabonne pour de vrai, alors une décision ne part que cinq cartes
+plus tard : assez loin pour changer d'avis, assez près pour que rien n'attende
+la fin.
 
 ## Installation
 
@@ -118,8 +198,8 @@ Permissions demandées : `storage`, `unlimitedStorage`, `alarms`, et l'accès à
 d'aide de la popup.
 
 Le relevé de ce que tu regardes est **désactivé jusqu'à ce que tu l'actives**. Le
-désactiver ensuite n'efface pas ce qui a déjà été enregistré ; la page
-d'analyse a un bouton pour cela.
+désactiver ensuite n'efface pas ce qui a déjà été enregistré ; la page d'analyse
+a un bouton pour cela.
 
 Un seul compte YouTube par profil de navigateur. La base se rattache au premier
 compte qu'elle voit et refuse les écritures venues d'un autre, pour que deux

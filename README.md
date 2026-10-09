@@ -5,8 +5,9 @@
 **Your YouTube subscriptions, in order, without Shorts.**
 
 TrackTube replaces YouTube's Subscriptions page with the full chronological list
-of what the channels you follow have published. No ranking, no recommendations,
-no Shorts carousels in the middle of the list. Everything stays in your browser.
+of what the channels you follow have published. No recommendations, no Shorts,
+and no video missing from a channel you are subscribed to. Everything stays in
+your browser.
 
 ![The feed, inside YouTube](screenshots/feed.jpg)
 
@@ -14,62 +15,138 @@ no Shorts carousels in the middle of the list. Everything stays in your browser.
 
 ## Why
 
-YouTube's Subscriptions page stopped being a list. It opens on a "For you"
-block, a row of live streams, and Shorts carousels come back between the rows.
-What you actually subscribed to is in there somewhere, in an order nobody can
-explain, and a video that never made it to the page is indistinguishable from a
-video that was never published.
+YouTube's Subscriptions page does show the most recent videos, and it shows them
+in the right order. There is nothing strange about the order. The problem is
+what sits above it.
 
-TrackTube rebuilds that list from each channel's own public feed, one channel at
+The two sections that open the page, and that take the whole screen on the way
+in, are a carousel of what YouTube judges most relevant and a carousel of
+Shorts. Both are recommendations. The chronological list of the channels you
+actually subscribed to begins under them, once you have scrolled past.
+
+And that list is not always complete. A video from a channel you follow
+sometimes never appears at all, and sometimes appears days late.
+
+The direction of travel is the rest of the answer. At Made on YouTube in
+September 2026, YouTube announced
+[Custom Feeds](https://techcrunch.com/2026/09/23/youtube-will-let-you-build-your-own-algorithm-with-ai/):
+you describe in your own words the videos you would like recommended, Gemini
+builds the feed, and it gets a tab of its own next to Home. Nothing comparable
+was announced for the subscription list.
+
+That list used to be the whole point. You subscribed to the people you wanted to
+support, and refreshing the page each day told you which of them had posted
+something new. That is what a subscription was for, and it is what is quietly
+going away.
+
+TrackTube rebuilds the list from each channel's own public feed, one channel at
 a time, and shows it in place of YouTube's. Nothing is filtered unless you asked
 for it.
+
+---
 
 ## What you get
 
 ### A feed that empties
 
-Hide a video and it leaves for good — unlike YouTube's own "not interested", a
-hidden video here is never loaded, never read, never rendered, so hiding
-thousands of them costs nothing. Star the ones you mean to watch and they get
-their own view. Start a video, come back the next day, and it is still in
-**In progress** with the progress bar where you left it.
+YouTube has a hide of its own. What is wrong with it is not that it is missing,
+it is that it is impractical: the tile turns grey and stays exactly where it
+was, so hiding twenty videos in a row means aiming at a page that never changes
+shape. Here the card leaves the grid as you click, which is what makes hiding in
+a chain possible, and a selection mode does it by the batch.
 
-Hovering a thumbnail plays the video in place, muted, with a sound button if you
-want it. Search covers every title and channel the extension holds, without
-going through YouTube's search.
+The other half of the problem is not visual. A hidden video is still fetched and
+drawn; on a page where nearly everything is hidden and ten videos are kept,
+which is what a month looks like once you use the feed as a list of things to
+watch, every month makes the page slower. Here hiding is filtered inside the
+database index itself: a hidden video is never read, never deserialised, never
+rendered. The cost of hiding is constant, and the feed opens as fast with forty
+thousand videos hidden as with ten.
 
-### An analysis of what you actually watch
+That is the use TrackTube is built around. The feed is a list of videos to
+watch, that you empty: the moment you know you will not watch something, or you
+have already seen it, it goes.
 
-![The history analysis](screenshots/history.png)
+**Stars** are for the other direction. Out of a batch of twenty new videos,
+star the two you really mean to watch so they are not lost among the rest, and
+they also get a view of their own.
 
-Time watched, channels you never miss, how long you wait before opening a video,
-where you drop off, which subjects come back in the titles, when in the day you
-watch. It measures what you watch from the moment you enable it, and a Google
-Takeout export fills in the years before that.
-
-Every figure says what it rests on. A total computed over 590 dated viewings out
-of 876 says so on screen; a figure that would only be a guess prints a dash
-instead. There are also three small games built on the same data — a year in
-review, a head to head and a knockout tournament between your own channels.
-
-### A card by card review of your subscriptions
-
-![Sorting subscriptions](screenshots/triage.jpg)
-
-Subscription lists grow for years. This one walks them one at a time, showing
-each channel's latest videos, how often it publishes, when it last did, and how
-much of it you actually watched. Right to keep, left to unsubscribe. Channels
-that stopped publishing come first.
-
-Unsubscribing really unsubscribes, so a decision only goes out five cards later
-— far enough to change your mind, close enough that nothing waits for the end.
+**In progress** tells you which videos you have already started and lets you
+pick one up where you left it, from its own view. And if you want the list to
+empty itself, you can turn on hiding a video automatically once you have
+watched it, with the share of the video that counts as watched being yours to
+set.
 
 ### A popup that tells you where things stand
 
 <img src="screenshots/popup.png" alt="The popup" width="400">
 
-What arrived in the last day, week and month, what is starred, what is in
-progress, how much is hidden, and when the last collection ran.
+One switch turns the takeover of the Subscriptions page off and back on, so
+YouTube's own page comes back untouched whenever you want it.
+
+Under it, the figures worth a glance: what arrived in the last day, week and
+month, what is starred, what is in progress, how much is hidden, and when the
+last collection ran. Then the two doors to the rest of the extension, which are
+the next two sections here: the analysis of what you watch, and the card by
+card review of your subscriptions.
+
+### An analysis of what you actually watch
+
+![The history analysis](screenshots/history.png)
+
+Time watched over any range, by channel and by day. The channels you never miss,
+and how long your run on each of them is. The delay between a publication and
+the moment you opened it. Where you stop watching. What you go back to and how
+often. The subjects that keep coming back in the titles, and a broader
+classification by topic. The hour of the day and the day of the week you watch
+at. Your sittings, meaning viewings grouped into one stretch, and how long they
+run. How often a channel publishes. And a day by day journal that shows one
+day's rows exactly as they are stored, which is the first place to look when a
+figure elsewhere looks wrong.
+
+It draws on three sources, and always says which. A Google Takeout export
+covers the years before you installed anything. YouTube's own history page can
+be read for the years an export does not reach. And if you turn tracking on,
+the extension measures your viewing itself, **in more detail than YouTube's own
+history**: YouTube records that you opened a video, while the extension records
+when, for how long, and how far into it you got.
+
+Every figure says what it rests on. A total computed over 590 dated viewings out
+of 876 says so on screen; a figure that would only be a guess prints a dash
+instead.
+
+Three small games are built on the same data:
+
+- **Recap** turns a year, or any range you pick, into six full screen cards: the
+  hours watched, the podium of your channels by number of videos and by time
+  spent, your peak hour and your record day, the words that keep coming back in
+  the titles, and your longest unbroken run on a single channel. Each card
+  exports as an image.
+- **Duel** puts two of your channels side by side and asks you to bet which one
+  you watched more, before the figures appear. You think you know your own
+  viewing; being wrong two times out of three says more than a tidy ranking.
+- **Tournament** is a knockout bracket between your channels where no figure is
+  shown during the duels, so you vote for the channel you would keep rather than
+  for the one you watched most. The two rankings do not coincide, and that gap
+  is the whole point.
+
+### A card by card review of your subscriptions
+
+![Sorting subscriptions](screenshots/triage.jpg)
+
+The gesture is the one from the dating apps, and that is deliberate: one channel
+per card, right to keep, left to unsubscribe, and nothing to read before
+deciding. Each card carries that channel's latest videos, how often it
+publishes, when it last did, and how much of it you actually watched. Channels
+that have stopped publishing come first.
+
+A subscription list grows for years and nobody ever prunes it. Going through it
+once in a while is worth the half hour, and it is not only housekeeping: a good
+half of the cards are channels you subscribed to eight years ago and had
+forgotten about, which turns out to be the nicest part.
+
+Unsubscribing really unsubscribes, so a decision only goes out five cards later
+— far enough to change your mind, close enough that nothing waits for the end.
 
 ## Install
 
