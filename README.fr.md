@@ -2,6 +2,8 @@
 
 [English](README.md) · **Français**
 
+![TrackTube : fil des abonnements, filtrage des Shorts, historique et tri carte par carte](store-assets/marquee.png)
+
 **Tes abonnements YouTube, dans l'ordre, avec filtrage des Shorts.**
 
 TrackTube remplace la page Abonnements de YouTube par un fil chronologique
@@ -9,8 +11,6 @@ collecté chaîne par chaîne. Il retire les recommandations, filtre les Shorts
 identifiés et permet d'actualiser les publications récentes pour rattraper des
 manques. YouTube peut retarder ou cacher des publications et la classification
 des Shorts ; la couverture n'est donc pas absolue. Tout reste dans ton navigateur.
-
-![Le feed, dans YouTube](screenshots/feed.jpg)
 
 ---
 
@@ -44,6 +44,8 @@ filtré sans que tu l'aies demandé.
 ## Ce que tu obtiens
 
 ### Un feed qui se vide
+
+![Le feed, dans YouTube](screenshots/feed.jpg)
 
 Masque une vidéo et la carte quitte la grille au moment du clic, donc tu peux
 masquer à la chaîne, et un mode sélection le fait par lots. Le masquage de

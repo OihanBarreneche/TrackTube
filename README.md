@@ -2,6 +2,8 @@
 
 **English** · [Français](README.fr.md)
 
+![TrackTube: a subscription feed with Shorts filtering, watch history and card-by-card review](store-assets/marquee.png)
+
 **Your YouTube subscriptions, in order, with Shorts filtering.**
 
 TrackTube replaces YouTube's Subscriptions page with a chronological feed
@@ -9,8 +11,6 @@ collected channel by channel. It removes recommendations, filters identified
 Shorts, and lets you refresh recent uploads to catch gaps. YouTube can delay or
 withhold publications and Shorts classifications, so coverage is not absolute.
 Everything stays in your browser.
-
-![The feed, inside YouTube](screenshots/feed.jpg)
 
 ---
 
@@ -43,6 +43,8 @@ for it.
 ## What you get
 
 ### A feed that empties
+
+![The feed, inside YouTube](screenshots/feed.jpg)
 
 Hide a video and the card leaves the grid as you click, so you can hide in a
 chain, and a selection mode does it by the batch. YouTube's own hide greys the

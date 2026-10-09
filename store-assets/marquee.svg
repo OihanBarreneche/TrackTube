@@ -9,19 +9,20 @@
       <stop stop-color="#b59bff"/>
       <stop offset="1" stop-color="#7059f5"/>
     </linearGradient>
-    <linearGradient id="thumb-a" x2="1" y2="1">
-      <stop stop-color="#384e82"/><stop offset="1" stop-color="#8b6fd8"/>
+    <linearGradient id="history-area" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#9e86ff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#9e86ff" stop-opacity=".06"/>
     </linearGradient>
-    <linearGradient id="thumb-b" x2="1" y2="1">
-      <stop stop-color="#5c3373"/><stop offset="1" stop-color="#db7890"/>
-    </linearGradient>
-    <linearGradient id="thumb-c" x2="1" y2="1">
-      <stop stop-color="#205a65"/><stop offset="1" stop-color="#66a997"/>
+    <linearGradient id="review-card" x2="1" y2="1">
+      <stop stop-color="#28233f"/><stop offset="1" stop-color="#172d34"/>
     </linearGradient>
     <filter id="shadow" x="-25%" y="-35%" width="160%" height="190%">
       <feDropShadow dx="0" dy="16" stdDeviation="25" flood-color="#05040f" flood-opacity=".45"/>
     </filter>
-    <clipPath id="feed-clip"><rect x="550" y="42" width="508" height="476" rx="27"/></clipPath>
+    <clipPath id="feed-clip"><rect x="550" y="42" width="508" height="436" rx="27"/></clipPath>
+    <clipPath id="thumb-1"><rect x="583" y="182" width="112" height="70" rx="12"/></clipPath>
+    <clipPath id="thumb-2"><rect x="583" y="285" width="112" height="70" rx="12"/></clipPath>
+    <clipPath id="thumb-3"><rect x="583" y="388" width="112" height="70" rx="12"/></clipPath>
   </defs>
 
   <rect width="1400" height="560" fill="url(#background)"/>
@@ -39,66 +40,72 @@
   <text x="75" y="302" fill="#cbbcff" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="700">on your terms.</text>
   <text x="76" y="362" fill="#bdb5d7" font-family="Arial, Helvetica, sans-serif" font-size="21">A chronological feed for the channels</text>
   <text x="76" y="390" fill="#bdb5d7" font-family="Arial, Helvetica, sans-serif" font-size="21">you chose to follow.</text>
-  <rect x="75" y="447" width="212" height="43" rx="21" fill="#493987" opacity=".75"/>
-  <text x="95" y="474" fill="#e6dcff" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing=".5">NO RECOMMENDATIONS</text>
+  <rect x="75" y="447" width="245" height="43" rx="21" fill="#493987" opacity=".75"/>
+  <text x="197.5" y="474" text-anchor="middle" fill="#e6dcff" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" letter-spacing=".5">NO RECOMMENDATIONS</text>
 
   <!-- An illustrative feed, drawn with the same dark cards and purple accents. -->
-  <g filter="url(#shadow)"><rect x="550" y="42" width="508" height="476" rx="27" fill="#11101f" stroke="#514379" stroke-width="2"/></g>
+  <g filter="url(#shadow)"><rect x="550" y="42" width="508" height="436" rx="27" fill="#11101f" stroke="#514379" stroke-width="2"/></g>
   <g clip-path="url(#feed-clip)">
     <rect x="550" y="42" width="508" height="76" fill="#17142b"/>
     <text x="583" y="90" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700">Subscriptions</text>
-    <circle cx="1015" cy="80" r="17" fill="#272140"/><path d="M1015 70v11l8 5" fill="none" stroke="#aa98fb" stroke-width="3" stroke-linecap="round"/>
     <rect x="583" y="132" width="50" height="30" rx="15" fill="#9d82fa"/>
     <text x="600" y="152" fill="#141021" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700">All</text>
     <rect x="643" y="132" width="91" height="30" rx="15" fill="#25213c"/>
     <text x="661" y="152" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">Priority</text>
     <rect x="744" y="132" width="113" height="30" rx="15" fill="#25213c"/>
     <text x="759" y="152" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">In progress</text>
+    <rect x="867" y="132" width="80" height="30" rx="15" fill="#25213c"/>
+    <text x="883" y="152" fill="#c6bee5" font-family="Arial, Helvetica, sans-serif" font-size="15">Hidden</text>
 
-    <rect x="583" y="182" width="112" height="70" rx="12" fill="url(#thumb-a)"/>
-    <circle cx="661" cy="207" r="22" fill="#c2afff" opacity=".45"/>
-    <path d="M583 235l40-35 21 19 26-15 25 31" fill="#211a53" opacity=".7"/>
-    <text x="711" y="217" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Latest uploads</text>
-    <text x="711" y="241" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">Published today</text>
-    <path d="M994 191l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z" fill="#b89aff"/>
+    <image href="thumbnails/lake.jpg" x="583" y="182" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-1)"/>
+    <text x="711" y="217" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Videos to watch</text>
+    <text x="711" y="241" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">From your subscriptions</text>
+    <circle cx="1004" cy="197" r="14" fill="#29243e"/>
+    <path d="M998 191l12 12m0-12l-12 12" stroke="#c6badd" stroke-width="2.5" stroke-linecap="round"/>
 
     <path d="M583 269h442" stroke="#302a48"/>
-    <rect x="583" y="285" width="112" height="70" rx="12" fill="url(#thumb-b)"/>
-    <circle cx="616" cy="318" r="21" fill="#fec6a8" opacity=".65"/>
-    <path d="M583 340l39-16 29 12 44-31v50H583Z" fill="#4a265e" opacity=".65"/>
-    <text x="711" y="322" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Keep watching</text>
-    <rect x="711" y="345" width="234" height="4" rx="2" fill="#403956"/>
-    <rect x="711" y="345" width="89" height="4" rx="2" fill="#a68cff"/>
+    <image href="thumbnails/road.jpg" x="583" y="285" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-2)"/>
+    <text x="711" y="322" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Mark as priority</text>
+    <text x="711" y="346" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="14">Keep your picks close</text>
+    <path d="M983 317l4 8 9 1-7 7 2 9-8-4-8 4 2-9-7-7 9-1z" fill="#b89aff"/>
+    <circle cx="1004" cy="300" r="14" fill="#29243e"/>
+    <path d="M998 294l12 12m0-12l-12 12" stroke="#c6badd" stroke-width="2.5" stroke-linecap="round"/>
 
     <path d="M583 372h442" stroke="#302a48"/>
-    <rect x="583" y="388" width="112" height="70" rx="12" fill="url(#thumb-c)"/>
-    <circle cx="644" cy="417" r="28" fill="#abe6bd" opacity=".45"/>
-    <path d="M583 449l35-21 23 8 54-23v45H583Z" fill="#174049" opacity=".7"/>
-    <text x="711" y="411" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Videos to watch</text>
-    <text x="711" y="437" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="13">From your subscriptions</text>
-    <circle cx="997" cy="416" r="15" fill="#403465"/>
-    <path d="M997 407v18m-9-9h18" stroke="#d7c9ff" stroke-width="3" stroke-linecap="round"/>
-    <path d="M583 480h442" stroke="#302a48"/>
-    <circle cx="598" cy="499" r="9" fill="#9b79ef"/><circle cx="613" cy="499" r="9" fill="#80b2d5"/><circle cx="628" cy="499" r="9" fill="#e0a485"/>
-    <text x="647" y="505" fill="#c8bee8" font-family="Arial, Helvetica, sans-serif" font-size="15">Sort your subscriptions</text>
+    <image href="thumbnails/city.jpg" x="583" y="388" width="112" height="70" preserveAspectRatio="xMidYMid slice" clip-path="url(#thumb-3)"/>
+    <text x="711" y="418" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Keep watching</text>
+    <rect x="711" y="440" width="234" height="5" rx="2.5" fill="#403956"/>
+    <rect x="711" y="440" width="89" height="5" rx="2.5" fill="#a68cff"/>
+    <circle cx="1004" cy="403" r="14" fill="#29243e"/>
+    <path d="M998 397l12 12m0-12l-12 12" stroke="#c6badd" stroke-width="2.5" stroke-linecap="round"/>
   </g>
 
-  <!-- The floating controls make the other capabilities readable at a glance. -->
-  <g filter="url(#shadow)"><rect x="1082" y="64" width="270" height="112" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
-  <rect x="1105" y="89" width="38" height="60" rx="10" fill="none" stroke="#a98df9" stroke-width="4"/>
-  <path d="M1117 102l16 16-16 16z" fill="#ad93ff"/><path d="M1100 151l46-64" stroke="#e8d9ff" stroke-width="5" stroke-linecap="round"/>
-  <text x="1162" y="111" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Shorts</text>
-  <text x="1162" y="139" fill="#cab8ff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">filtered</text>
+  <!-- Three compact companion cards: filtering, analysis, channel review. -->
+  <g filter="url(#shadow)"><rect x="1114" y="63" width="204" height="112" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
+  <rect x="1138" y="88" width="34" height="56" rx="9" fill="none" stroke="#a98df9" stroke-width="4"/>
+  <path d="M1149 101l14 15-14 15z" fill="#ad93ff"/><path d="M1133 145l43-60" stroke="#e8d9ff" stroke-width="5" stroke-linecap="round"/>
+  <text x="1191" y="112" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Shorts</text>
+  <text x="1191" y="139" fill="#cab8ff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">filtered</text>
 
-  <g filter="url(#shadow)"><rect x="1082" y="197" width="270" height="112" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
-  <path d="M1130 220l7 14 16 2-12 12 3 16-14-8-14 8 3-16-12-12 16-2z" fill="#c4a9ff"/>
-  <text x="1162" y="244" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Save for later</text>
-  <text x="1162" y="271" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="15">Priority videos stay close</text>
+  <g filter="url(#shadow)"><rect x="1082" y="198" width="270" height="158" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
+  <text x="1107" y="235" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Watch history</text>
+  <path d="M1107 331h95m22 0h103" stroke="#5c507a" stroke-width="2"/>
+  <path d="M1117 329v-22m14 22v-37m14 37v-26m14 26v-49m14 49v-31m14 31v-57" stroke="#977bf3" stroke-width="10" stroke-linecap="round"/>
+  <path d="M1214 267v66" stroke="#4e426f" stroke-width="2"/>
+  <path d="M1224 331v-23l16-11 15 13 15-23 15 12 15-30 15 9 12-21v74z" fill="url(#history-area)"/>
+  <path d="M1224 308l16-11 15 13 15-23 15 12 15-30 15 9 12-21" fill="none" stroke="#b69dff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 
-  <g filter="url(#shadow)"><rect x="1082" y="330" width="270" height="179" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
-  <text x="1108" y="368" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="700">Watch history</text>
-  <text x="1108" y="392" fill="#a9a1c2" font-family="Arial, Helvetica, sans-serif" font-size="15">See your viewing patterns</text>
-  <path d="M1108 468h218" stroke="#4c436e" stroke-width="2"/>
-  <path d="M1113 458v-21m24 21v-39m24 39v-27m24 27v-50m24 50v-36m24 36v-57m24 57v-42m24 42v-61m24 61v-47" stroke="#7562c5" stroke-width="13" stroke-linecap="round"/>
-  <path d="M1108 434l25-12 26 9 25-31 25 20 24-30 25 16 25-27 24 15" fill="none" stroke="#d0b5ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <g filter="url(#shadow)"><rect x="1082" y="377" width="270" height="141" rx="22" fill="#1d1935" stroke="#655493" stroke-width="2"/></g>
+  <text x="1107" y="413" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700">Card-by-card review</text>
+  <g transform="rotate(-3 1217 465)">
+    <rect x="1121" y="430" width="192" height="59" rx="12" fill="url(#review-card)" stroke="#746894" stroke-width="1.5"/>
+    <circle cx="1148" cy="457" r="17" fill="#9d82fa"/>
+    <path d="M1138 462a11 11 0 0 1 20 0" fill="#e8dfff"/><circle cx="1148" cy="451" r="5" fill="#e8dfff"/>
+    <rect x="1178" y="445" width="78" height="7" rx="3.5" fill="#ddd7ed"/>
+    <rect x="1178" y="460" width="52" height="5" rx="2.5" fill="#9489aa"/>
+    <rect x="1264" y="443" width="14" height="28" rx="4" fill="#7067a5"/>
+    <rect x="1282" y="447" width="14" height="24" rx="4" fill="#7aaf9e"/>
+  </g>
+  <path d="M1137 496h-19m0 0 8-7m-8 7 8 7" fill="none" stroke="#bcb0dc" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M1296 496h20m0 0-8-7m8 7-8 7" fill="none" stroke="#8cddb9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
