@@ -23,6 +23,9 @@ export async function run() {
   const originalFetch = globalThis.fetch;
   let longCalls=0, playerCalls=0, failPlaylist=false, failAllDirect=false, authenticatedFacts=false;
   globalThis.fetch = async (url,opts) => {
+    if (String(url) === 'https://www.youtube.com/') {
+      return new Response('<script>ytcfg.set({"INNERTUBE_API_KEY":"local_test_key_0123456789012345"});</script>');
+    }
     if (String(url).includes('/feeds/videos.xml')) return new Response(xml);
     if (String(url).includes('/player')) {
       playerCalls++;

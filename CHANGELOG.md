@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.2 — 9 October 2026
+
+- Remove the bundled YouTube web-client API key from both runtime call paths.
+  Read the public configuration from YouTube at runtime instead; anonymous
+  channel collection and its Atom fallback remain available.
+- Reject future Store packages that contain a Google API key literal.
+- No local database schema change from 1.1.1.
+
 ## 1.1.1 — 9 October 2026
 
 - Use English for the Chrome Web Store summary and small promotional image.

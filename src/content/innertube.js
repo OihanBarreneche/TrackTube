@@ -39,13 +39,8 @@ import {
 const ORIGIN = 'https://www.youtube.com';
 const RE_CHANNEL_ID = /^UC[\w-]{22}$/;
 const RE_VIDEO_ID = /^[\w-]{11}$/;
-// Same public web client as the service worker's direct collector. Channel
-// pages are public, so their availability must not depend on browser-specific
-// cookie or page-world behaviour.
-const PUBLIC_WEB_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
-const PUBLIC_CONTEXT = {
-  client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: 'en', gl: 'US' },
-};
+// Public calls use the current page's YouTube web-client configuration, but
+// only its client fields and no account cookies or authentication headers.
 
 /** Configuration read once per page. */
 let config = null;
@@ -87,9 +82,7 @@ async function authorization() {
  * nowhere else; everywhere else the site's own language is the right one.
  */
 async function call(endpoint, body, { hl = null, authenticated = true } = {}) {
-  const cfg = authenticated
-    ? await getConfig()
-    : { key: PUBLIC_WEB_KEY, context: PUBLIC_CONTEXT, sessionIndex: 0 };
+  const cfg = await getConfig();
   if (!cfg) { log.warn('Innertube configuration not found'); return null; }
 
   const auth = authenticated ? await authorization() : null;
@@ -98,9 +91,13 @@ async function call(endpoint, body, { hl = null, authenticated = true } = {}) {
   // Public channel pages need only the web-client context. Keeping account and
   // request fields while omitting the cookie can make Chromium variants reject
   // an otherwise public call as a malformed signed request.
+  const publicClient = cfg.context.client ?? {};
   const baseContext = authenticated
     ? cfg.context
-    : { client: { ...cfg.context.client } };
+    : { client: {
+      clientName: 'WEB', clientVersion: publicClient.clientVersion,
+      hl: publicClient.hl ?? 'en', gl: publicClient.gl ?? 'US',
+    } };
   const context = hl
     ? { ...baseContext, client: { ...baseContext.client, hl, gl: 'US' } }
     : baseContext;
@@ -133,9 +130,8 @@ async function call(endpoint, body, { hl = null, authenticated = true } = {}) {
 
 /** Is the internal API usable on this page? */
 export async function innertubeAvailable({ authenticated = true } = {}) {
-  if (!authenticated) return true;
   if (!await getConfig()) return false;
-  return Boolean(await authorization());
+  return !authenticated || Boolean(await authorization());
 }
 
 // ---------------------------------------------------------------------------

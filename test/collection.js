@@ -23,6 +23,9 @@ export async function run() {
   const originalFetch = globalThis.fetch;
   let playerCalls = 0;
   globalThis.fetch = async (url, opts) => {
+    if (String(url) === 'https://www.youtube.com/') {
+      return new Response('<script>ytcfg.set({"INNERTUBE_API_KEY":"local_test_key_0123456789012345"});</script>');
+    }
     playerCalls++;
     const { videoId } = JSON.parse(opts.body);
     return Response.json({ videoDetails: { videoId, lengthSeconds: '31' },
@@ -84,6 +87,15 @@ export async function run() {
 
     // Exercise the real pagination client, with deterministic response pages.
     const { fetchChannelVideosTab } = await import('../src/content/innertube.js');
+    window.addEventListener('message', event => {
+      const message = event.data;
+      if (message?.source !== 'tracktube-iso' || message.type !== 'innertube-config') return;
+      window.postMessage({source: 'tracktube-main', type: 'innertube-config', payload: {
+        requestId: message.requestId,
+        key: 'local_test_key_0123456789012345',
+        context: {client: {clientName: 'WEB', clientVersion: '2.20261008.01.00'}},
+      }}, window.location.origin);
+    });
     const card = (id, age) => ({richItemRenderer: {content: {videoRenderer: {
       videoId: id, title: {simpleText: id}, publishedTimeText: {simpleText: age},
       lengthText: {simpleText: '10:00'},

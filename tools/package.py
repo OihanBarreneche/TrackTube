@@ -1,6 +1,7 @@
 """Build a runtime-only distribution candidate, without profile or audit data."""
 from pathlib import Path
 import json
+import re
 import zipfile
 
 root = Path(__file__).resolve().parent.parent
@@ -11,6 +12,12 @@ for directory in ('src', 'icons'):
     files.extend(path for path in (root / directory).rglob('*') if path.is_file())
 if any(not path.is_file() for path in files):
     raise SystemExit('Missing runtime file')
+google_key = re.compile(rb'AIza[0-9A-Za-z_-]{20,}')
+leaked_files = [path.relative_to(root).as_posix() for path in files
+                if google_key.search(path.read_bytes())]
+if leaked_files:
+    raise SystemExit('Refusing to package embedded Google API keys: '
+                     + ', '.join(leaked_files))
 output = root / 'dist'
 output.mkdir(exist_ok=True)
 archive = output / f"tracktube-{manifest['version']}-candidate.zip"

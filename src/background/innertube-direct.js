@@ -43,15 +43,10 @@ import {
 const ORIGIN = 'https://www.youtube.com';
 const RE_CHANNEL_ID = /^UC[\w-]{22}$/;
 
-/**
- * Public key of YouTube's web client.
- *
- * It sits in clear text in the source of every youtube.com page and is the same
- * for everyone: it is not a secret, only the label saying which client is
- * speaking. The content script reads the one of the current page through
- * `ytcfg` — here there is no page, hence the hard coded value.
- */
-const WEB_KEY = 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8';
+// The worker has no page-world `ytcfg`. It reads YouTube's current public web
+// configuration on demand instead of shipping a copied client key in TrackTube.
+let webConfig = null;
+let webConfigPending = null;
 
 /**
  * Minimal client context.
@@ -63,6 +58,43 @@ const CONTEXT = {
   client: { clientName: 'WEB', clientVersion: '2.20240101.00.00', hl: 'en', gl: 'US' },
 };
 
+/** Read only the public client fields needed by anonymous InnerTube calls. */
+export function parsePublicWebConfig(html) {
+  const key = html.match(/"INNERTUBE_API_KEY"\s*:\s*"([A-Za-z0-9_-]{20,120})"/)?.[1];
+  if (!key) return null;
+  const version = html.match(/"INNERTUBE_CLIENT_VERSION"\s*:\s*"([0-9.]{5,40})"/)?.[1];
+  return {
+    key,
+    context: { client: { ...CONTEXT.client, clientVersion: version ?? CONTEXT.client.clientVersion } },
+  };
+}
+
+async function getPublicWebConfig() {
+  if (webConfig) return webConfig;
+  if (!webConfigPending) {
+    webConfigPending = (async () => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const res = await fetch(`${ORIGIN}/`, {
+          credentials: 'omit', cache: 'no-store', signal: controller.signal,
+        });
+        if (!res.ok) return null;
+        return parsePublicWebConfig(await res.text());
+      } catch (err) {
+        if (err?.name !== 'AbortError') log.warn('YouTube web configuration unavailable', err);
+        return null;
+      } finally {
+        clearTimeout(timeout);
+      }
+    })();
+  }
+  const config = await webConfigPending;
+  if (config) webConfig = config;
+  webConfigPending = null;
+  return config;
+}
+
 /** Long form videos only, as with the Atom feeds: never any Shorts. */
 const PREFIX = { all: 'UU', long: 'UULF', shorts: 'UUSH', lives: 'UULV' };
 
@@ -73,23 +105,33 @@ const PREFIX = { all: 'UU', long: 'UULF', shorts: 'UUSH', lives: 'UULV' };
  * internal interface has changed under our feet.
  */
 async function call(endpoint, body, signal) {
+  if (signal?.aborted) return null;
+  const config = await getPublicWebConfig();
+  if (!config || signal?.aborted) return null;
+
   const controller = new AbortController();
   const abort = () => controller.abort();
   if (signal?.aborted) abort();
   else signal?.addEventListener('abort', abort, { once: true });
   const timeout = setTimeout(abort, 10000);
   try {
-    const res = await fetch(`${ORIGIN}/youtubei/v1/${endpoint}?key=${WEB_KEY}&prettyPrint=false`, {
+    const res = await fetch(`${ORIGIN}/youtubei/v1/${endpoint}?key=${config.key}&prettyPrint=false`, {
       method: 'POST',
       // Definitely not `include`: the request has nothing personal to ask for,
       // and sending it signed would tie a sweep of the entire subscription list
       // to the account.
       credentials: 'omit',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ context: CONTEXT, ...body }),
+      body: JSON.stringify({ context: config.context, ...body }),
       signal: controller.signal,
     });
-    if (!res.ok) { log.warn(`Direct InnerTube: ${endpoint} → HTTP ${res.status}`); return null; }
+    if (!res.ok) {
+      // A changed client key is re-read for the next attempt. The caller's
+      // existing Atom fallback handles this request without stale credentials.
+      if (res.status === 400 || res.status === 403) webConfig = null;
+      log.warn(`Direct InnerTube: ${endpoint} → HTTP ${res.status}`);
+      return null;
+    }
     return await res.json();
   } catch (err) {
     if (err?.name !== 'AbortError') log.warn('Direct InnerTube unreachable', err);

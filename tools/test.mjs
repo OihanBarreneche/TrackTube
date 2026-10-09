@@ -9,6 +9,7 @@ import { createRequire } from 'node:module';
 import { checkPreview } from '../test/preview-playback-checks.mjs';
 import { checkUiCache } from '../test/ui-cache-checks.mjs';
 import { createBenchServer } from './test-server.mjs';
+import '../test/innertube-config.test.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.TRACKTUBE_PLAYWRIGHT_PATH || 'playwright');
