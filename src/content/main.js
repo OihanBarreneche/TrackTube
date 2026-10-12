@@ -452,13 +452,13 @@ async function maybeReconcile() {
   const clean = channels.map(sanitizeChannel).filter(Boolean);
   if (!clean.length) return;
 
-  // The date is only set on success: a failure must be able to retry on the
-  // next page, not wait twenty four hours.
-  await chrome.storage.local.set({ [RECONCILE_KEY]: Date.now() });
-
-  const res = await send(MSG.IMPORT_SUBSCRIPTIONS, { channels: clean, complete, key: activeAccountKey() });
+  const res = await send(MSG.IMPORT_SUBSCRIPTIONS, {
+    channels: clean, complete, automatic: true, key: activeAccountKey(),
+  });
   const r = res?.result;
   if (!res?.ok || !r) return;
+  // A rejected import must be retried on the next page, not postponed a day.
+  await chrome.storage.local.set({ [RECONCILE_KEY]: Date.now() });
 
   log.info(`Reconciliation: ${r.added} added, ${r.deactivated} removed`);
 

@@ -1676,6 +1676,24 @@ async function testChannels(check) {
 
   const due = await db.getDueChannels(50);
   check('getDueChannels ignore les chaînes inactives', due.length === 2, due.map((c) => c.id));
+
+  await db.reconcileChannels([mkChannel(1), mkChannel(2), mkChannel(4)]);
+  const firstMiss = await db.reconcileChannels([mkChannel(1), mkChannel(2)],
+    { complete: true, confirmAbsent: true });
+  check('reconcile auto : une seule absence ne retire pas la chaîne',
+    firstMiss.deactivated === 0 && firstMiss.awaitingConfirmation === 1
+      && (await db.getChannel(channelId(4))).active === 1, firstMiss);
+  await db.reconcileChannels([mkChannel(1), mkChannel(2), mkChannel(4)],
+    { complete: true, confirmAbsent: true });
+  check('reconcile auto : revoir la chaîne annule le soupçon',
+    (await db.getChannel(channelId(4))).missingSince === 0);
+  await db.reconcileChannels([mkChannel(1), mkChannel(2)],
+    { complete: true, confirmAbsent: true });
+  await db.putChannel({ ...(await db.getChannel(channelId(4))), missingSince: Date.now() - DAY });
+  const confirmedMiss = await db.reconcileChannels([mkChannel(1), mkChannel(2)],
+    { complete: true, confirmAbsent: true });
+  check('reconcile auto : une absence confirmée retire la chaîne',
+    confirmedMiss.deactivated === 1 && confirmedMiss.deactivatedIds.includes(channelId(4)));
 }
 
 /**
@@ -2198,6 +2216,13 @@ async function testBackup(check) {
     publishedAt: BASE_TS, thumbUrl: 'https://e/b',
   }]);
   await db.setHidden([id], true);
+  const absentId = 'bkp0000003';
+  await db.upsertVideos([{
+    id: absentId, channelId: channelId(12), title: 'Masquée avant désabonnement',
+    publishedAt: BASE_TS, thumbUrl: 'https://e/absent',
+  }]);
+  await db.setHidden([absentId], true);
+  await db.deleteChannelVideos(channelId(12));
 
   // A channel deliberately left in the triage. It is in the backup, inactive,
   // and that is the whole point of the case.
@@ -2221,6 +2246,8 @@ async function testBackup(check) {
   check('export : les vidéos sans état ne sont pas exportées',
     dump.videos.every((v) => v.hidden || v.starred || v.watched || v.watchProgress),
     dump.videos.length);
+  check('export : le masquage survit à une chaîne sortie du fil',
+    dump.videoStates.some((state) => state.id === absentId && state.hidden === 1));
   check('export : l’historique importé est dedans',
     dump.history.some((e) => e.videoId === 'histo00001'), dump.history.length);
   check('export : les durées aussi, elles coûtent une requête chacune',
@@ -2240,7 +2267,7 @@ async function testBackup(check) {
 
   check('import : les abonnements sont recréés', restore.channels >= 3, restore.channels);
   check('import : la vidéo revient sans attendre une collecte',
-    restore.created === dump.videos.length && restore.pending === 0,
+    restore.created === dump.videos.length && restore.pending === 1,
     [restore.created, dump.videos.length, restore.pending]);
   check('import : l’historique est restauré', restore.history >= 1, restore.history);
   check('import : les durées sont restaurées', restore.durations >= 1, restore.durations);
@@ -2249,6 +2276,13 @@ async function testBackup(check) {
   const avecMasquees = await db.getFeedPage({ limit: 50, onlyHidden: true });
   check('import : la vidéo revient bien masquée',
     !visible.items.some((v) => v.id === id) && avecMasquees.items.some((v) => v.id === id));
+  await db.upsertVideos([{
+    id: absentId, channelId: channelId(12), title: 'Masquée avant désabonnement',
+    publishedAt: BASE_TS, thumbUrl: 'https://e/absent',
+  }]);
+  check('import : une vidéo absente au moment de la sauvegarde revient masquée',
+    (await db.getFeedPage({ limit: 50, onlyHidden: true })).items
+      .some((v) => v.id === absentId));
 
   // The restore went through `reconcileChannels`, which reactivates everything
   // it is handed — right for an import from YouTube, wrong for a backup. On a
@@ -2413,6 +2447,38 @@ async function testChannelOperations(check) {
     (await db.getFeedPage({ limit: 50, channelId: channelId(8) })).items.length === 1);
   check('désabonnement : rien à supprimer au second passage',
     (await db.deleteChannelVideos(channelId(9))) === 0);
+
+  // A transient omission in YouTube's subscription list can remove the channel
+  // and recollect the same older uploads later. Previously this made an entire
+  // batch of already hidden videos visible again.
+  const recollected = [
+    { id: 'desab00000', channelId: channelId(9), channelTitle: 'Quittée', title: 'Visible',
+      publishedAt: base + 3 * HOUR, thumbUrl: 'https://e/d1' },
+    { id: 'desab00001', channelId: channelId(9), channelTitle: 'Quittée', title: 'Masquée',
+      publishedAt: base + 4 * HOUR, thumbUrl: 'https://e/d2' },
+  ];
+  await db.upsertVideos(recollected);
+  const visibleAgain = await db.getFeedPage({ limit: 50, channelId: channelId(9) });
+  const hiddenAgain = await db.getFeedPage({ limit: 50, channelId: channelId(9), onlyHidden: true });
+  check('recollecte : une vidéo déjà masquée ne réapparaît pas',
+    visibleAgain.items.some((v) => v.id === 'desab00000')
+      && !visibleAgain.items.some((v) => v.id === 'desab00001')
+      && hiddenAgain.items.some((v) => v.id === 'desab00001'));
+
+  await db.setHidden(['desab00001'], false);
+  await db.deleteChannelVideos(channelId(9));
+  await db.upsertVideos(recollected);
+  check('recollecte : rendre une vidéo à nouveau visible efface ce choix',
+    (await db.getFeedPage({ limit: 50, channelId: channelId(9) })).items
+      .some((v) => v.id === 'desab00001'));
+
+  await db.setHidden(['desab00001'], true);
+  await db.setStarred(['desab00001'], true);
+  await db.deleteChannelVideos(channelId(9));
+  await db.upsertVideos(recollected);
+  check('recollecte : mettre une vidéo en priorité efface aussi son masquage',
+    (await db.getFeedPage({ limit: 50, channelId: channelId(9) })).items
+      .some((v) => v.id === 'desab00001'));
 
   // -- grouping of the missing durations, as the enrichment asks for it
   await db.upsertVideos([

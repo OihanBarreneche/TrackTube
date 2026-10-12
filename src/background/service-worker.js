@@ -2015,7 +2015,7 @@ route({
    *   on a truncated import — a partial file, an interrupted pagination — that
    *   would erase what is still being followed.
    */
-  [MSG.IMPORT_SUBSCRIPTIONS]: async ({ channels, complete = false, key = null }) => {
+  [MSG.IMPORT_SUBSCRIPTIONS]: async ({ channels, complete = false, automatic = false, key = null }) => {
     if (!Array.isArray(channels) || !channels.length) {
       throw new Error('Import vide');
     }
@@ -2026,7 +2026,7 @@ route({
     // daily reconciliation triggers it all by itself.
     if (!await rightAccount(key)) throw new Error('err.autrecompte');
 
-    const result = await reconcileChannels(channels, { complete });
+    const result = await reconcileChannels(channels, { complete, confirmAbsent: automatic });
     let purged = 0;
 
     if (complete && result.deactivatedIds?.length) {

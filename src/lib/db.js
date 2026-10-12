@@ -237,6 +237,7 @@ export async function metaSet(key, value) {
  * @property {number|null} uploadIntervalMs  median gap between uploads
  * @property {number} videoCount    videos known for this channel
  * @property {number} directBackfillAt  last complete Videos-tab rebuild
+ * @property {number} missingSince  first complete automatic list missing this channel
  * @property {'unknown'|'yes'|'no'} livesMode  does the channel broadcast live
  * @property {string|null} livesHash  fingerprint of the last lives feed seen
  */
@@ -249,6 +250,7 @@ export function makeChannel(id, title, avatarUrl, now = Date.now()) {
     avatarUrl: avatarUrl ?? '',
     addedAt: now,
     active: 1,
+    missingSince: 0,
     feedMode: 'UULF',
     feedHash: null,
     lastFetchAt: 0,
@@ -299,7 +301,7 @@ export async function putChannel(channel) {
  *
  * @param {Array<{id: string, title?: string, avatarUrl?: string}>} imported
  */
-export async function reconcileChannels(imported, { complete = false } = {}) {
+export async function reconcileChannels(imported, { complete = false, confirmAbsent = false } = {}) {
   const now = Date.now();
   const seen = new Set(imported.map((c) => c.id));
 
@@ -322,6 +324,7 @@ export async function reconcileChannels(imported, { complete = false } = {}) {
         // erase what a full import had picked up.
         if (Number.isFinite(inc.subscriberCount)) prev.subscriberCount = inc.subscriberCount;
         if (inc.handle) prev.handle = inc.handle;
+        prev.missingSince = 0;
         if (!prev.active) { prev.active = 1; prev.nextDueAt = 0; }
         await reqToPromise(store.put(prev));
         updated++;
@@ -350,10 +353,23 @@ export async function reconcileChannels(imported, { complete = false } = {}) {
     // costs one feed read per sweep until the next complete list; the opposite
     // mistake costs the videos.
     const deactivatedIds = [];
+    let awaitingConfirmation = 0;
     if (complete) {
       for (const prev of existing) {
         if (!seen.has(prev.id) && prev.active) {
+          // A completed pagination is not proof that YouTube returned every
+          // channel. One daily observation of absence only starts a grace
+          // period; a second, at least an hour later, confirms removal.
+          if (confirmAbsent && (!prev.missingSince || now - prev.missingSince < 60 * 60 * 1000)) {
+            if (!prev.missingSince) {
+              prev.missingSince = now;
+              await reqToPromise(store.put(prev));
+            }
+            awaitingConfirmation++;
+            continue;
+          }
           prev.active = 0;
+          prev.missingSince = 0;
           await reqToPromise(store.put(prev));
           deactivated++;
           deactivatedIds.push(prev.id);
@@ -362,7 +378,7 @@ export async function reconcileChannels(imported, { complete = false } = {}) {
     }
 
     return {
-      added, updated, deactivated, deactivatedIds, total: seen.size,
+      added, updated, deactivated, deactivatedIds, awaitingConfirmation, total: seen.size,
       // Said out loud so the caller never has to infer it from a zero.
       deactivationSkipped: !complete,
     };
@@ -567,8 +583,8 @@ export async function upsertVideos(incoming, { allowInsert = true } = {}) {
           durationSec: v.durationSec ?? null,
           shortVerifiedAt: classification?.isShort === false ? classification.checkedAt : 0,
           shortValidUntil: classification?.isShort === false ? classification.validUntil : 0,
-          hidden: 0,
-          hiddenAt: 0,
+          hidden: classification?.userHiddenAt ? 1 : 0,
+          hiddenAt: classification?.userHiddenAt || 0,
           starred: 0,
           starredAt: 0,
           watched: 0,
@@ -589,7 +605,13 @@ export async function upsertVideos(incoming, { allowInsert = true } = {}) {
         // finally shows up. That is what makes restoring onto an empty database
         // genuinely useful.
         const restored = pending[v.id];
-        if (restored) { applyUserState(record, restored); consumed.push(v.id); }
+        if (restored) {
+          applyUserState(record, restored);
+          if (restored.hidden !== undefined) {
+            await writeHiddenState(tx, v.id, record.hidden ? record.hiddenAt || now : 0);
+          }
+          consumed.push(v.id);
+        }
 
         await reqToPromise(store.put(record));
         inserted++;
@@ -869,17 +891,35 @@ function iterate(cursorReq, onRow) {
   });
 }
 
+// A hidden video's row may be removed when its channel disappears from a
+// subscription-list refresh. Keep the user's decision in the classification
+// store, which every subsequent insertion already reads in the same transaction.
+async function writeHiddenState(tx, id, hiddenAt) {
+  const store = tx.objectStore(STORE_SHORTS);
+  const previous = await reqToPromise(store.get(id));
+  if (hiddenAt) {
+    await reqToPromise(store.put({ ...previous, id, userHiddenAt: hiddenAt }));
+  } else if (previous?.userHiddenAt) {
+    const next = { ...previous };
+    delete next.userHiddenAt;
+    if (Object.keys(next).length === 1) await reqToPromise(store.delete(id));
+    else await reqToPromise(store.put(next));
+  }
+}
+
 /** Flips the hidden state of a batch of videos. */
 export async function setHidden(ids, hidden) {
   const now = Date.now();
   const flag = hidden ? 1 : 0;
 
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
     const store = tx.objectStore(STORE_VIDEOS);
     let changed = 0;
     for (const id of ids) {
       const v = await reqToPromise(store.get(id));
-      if (!v || v.hidden === flag) continue;
+      if (!v) continue;
+      await writeHiddenState(tx, id, hidden ? v.hiddenAt || now : 0);
+      if (v.hidden === flag) continue;
       v.hidden = flag;
       v.hiddenAt = hidden ? now : 0;
       // Hiding and starring contradict each other: a video set aside cannot stay
@@ -907,21 +947,21 @@ export async function hideChannelVideos(channelId, hidden = true) {
   const now = Date.now();
   const flag = hidden ? 1 : 0;
 
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
-    const index = tx.objectStore(STORE_VIDEOS).index('by_channel');
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
+    const store = tx.objectStore(STORE_VIDEOS);
+    const videos = await reqToPromise(store.index('by_channel').getAll(IDBKeyRange.only(channelId)));
     const changedIds = [];
 
-    await iterate(index.openCursor(IDBKeyRange.only(channelId)), (cursor) => {
-      const v = cursor.value;
+    for (const v of videos) {
+      await writeHiddenState(tx, v.id, hidden ? v.hiddenAt || now : 0);
       if ((v.hidden ?? 0) !== flag) {
         v.hidden = flag;
         v.hiddenAt = hidden ? now : 0;
         if (hidden) v.starred = 0;
-        cursor.update(v);
+        await reqToPromise(store.put(v));
         changedIds.push(v.id);
       }
-      return true;
-    });
+    }
 
     return changedIds;
   });
@@ -934,23 +974,22 @@ export async function hideChannelVideos(channelId, hidden = true) {
  * but would leave everything it has already published in the feed.
  * Unsubscribing and going on seeing its releases would make no sense.
  *
- * The deletion is physical, so those videos' local states (hidden, watched,
- * starred) go with them. That is acceptable here: on resubscribing,
- * synchronisation brings back the last fifteen videos, and the lost state
- * concerns a channel one had decided to leave.
+ * The deletion is physical, but hidden decisions survive a later resubscription
+ * or a temporary omission from YouTube's subscription list.
  *
  * @param {string} channelId
  * @returns {Promise<number>} number of videos deleted
  */
 export async function deleteChannelVideos(channelId) {
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
-    const index = tx.objectStore(STORE_VIDEOS).index('by_channel');
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
+    const store = tx.objectStore(STORE_VIDEOS);
+    const videos = await reqToPromise(store.index('by_channel').getAll(IDBKeyRange.only(channelId)));
     let removed = 0;
-    await iterate(index.openCursor(IDBKeyRange.only(channelId)), (cursor) => {
-      cursor.delete();
+    for (const video of videos) {
+      if (video.hidden) await writeHiddenState(tx, video.id, video.hiddenAt || Date.now());
+      await reqToPromise(store.delete(video.id));
       removed++;
-      return true;
-    });
+    }
     return removed;
   });
 }
@@ -963,21 +1002,23 @@ export async function setChannelStarred(channelId, starred) {
   const now = Date.now();
   const flag = starred ? 1 : 0;
 
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
-    const index = tx.objectStore(STORE_VIDEOS).index('by_channel');
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
+    const store = tx.objectStore(STORE_VIDEOS);
+    const videos = await reqToPromise(store.index('by_channel').getAll(IDBKeyRange.only(channelId)));
     const changedIds = [];
 
-    await iterate(index.openCursor(IDBKeyRange.only(channelId)), (cursor) => {
-      const v = cursor.value;
+    for (const v of videos) {
       if ((v.starred ?? 0) !== flag) {
         v.starred = flag;
         v.starredAt = starred ? now : 0;
-        if (starred && v.hidden) { v.hidden = 0; v.hiddenAt = 0; }
-        cursor.update(v);
+        if (starred && v.hidden) {
+          v.hidden = 0; v.hiddenAt = 0;
+          await writeHiddenState(tx, v.id, 0);
+        }
+        await reqToPromise(store.put(v));
         changedIds.push(v.id);
       }
-      return true;
-    });
+    }
 
     return changedIds;
   });
@@ -993,7 +1034,7 @@ export async function setStarred(ids, starred) {
   const now = Date.now();
   const flag = starred ? 1 : 0;
 
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
     const store = tx.objectStore(STORE_VIDEOS);
     let changed = 0;
     for (const id of ids) {
@@ -1003,7 +1044,10 @@ export async function setStarred(ids, starred) {
       v.starredAt = starred ? now : 0;
       // Starring a video necessarily brings it back into view: an invisible
       // priority is not what anyone wants.
-      if (starred && v.hidden) { v.hidden = 0; v.hiddenAt = 0; }
+      if (starred && v.hidden) {
+        v.hidden = 0; v.hiddenAt = 0;
+        await writeHiddenState(tx, id, 0);
+      }
       await reqToPromise(store.put(v));
       changed++;
     }
@@ -1556,13 +1600,16 @@ export async function getStats() {
  * @returns {Promise<number>} number of videos deleted
  */
 export async function purgeNativeInserted() {
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
+    const store = tx.objectStore(STORE_VIDEOS);
+    const videos = await reqToPromise(store.getAll());
     let removed = 0;
-    await iterate(tx.objectStore(STORE_VIDEOS).openCursor(), (cursor) => {
-      const v = cursor.value;
-      if (v.source === 'native' && !v.starred) { cursor.delete(); removed++; }
-      return true;
-    });
+    for (const v of videos) {
+      if (v.source !== 'native' || v.starred) continue;
+      if (v.hidden) await writeHiddenState(tx, v.id, v.hiddenAt || Date.now());
+      await reqToPromise(store.delete(v.id));
+      removed++;
+    }
     return removed;
   });
 }
@@ -1888,6 +1935,7 @@ export async function recordVideoClassification(
     if (isShort === true) {
       await reqToPromise(shorts.put({
         ...previous, id, isShort: true, checkedAt: at, validUntil: 0,
+        ...(video?.hidden ? { userHiddenAt: video.hiddenAt || Date.now() } : {}),
       }));
       await reqToPromise(videos.delete(id));
       return { blocked: true, removed: video ? 1 : 0 };
@@ -1925,6 +1973,8 @@ export async function recordMembersOnly(id, membersOnly, at = Date.now()) {
       id,
       membersOnly: membersOnly === true,
       membersCheckedAt: at,
+      ...(membersOnly === true && video?.hidden
+        ? { userHiddenAt: video.hiddenAt || Date.now() } : {}),
     }));
     if (membersOnly === true && video) await reqToPromise(videos.delete(id));
     return { blocked: membersOnly === true, removed: membersOnly === true && video ? 1 : 0 };
@@ -1980,12 +2030,13 @@ export async function markShortChecked(ids, at = Date.now()) {
  */
 export async function deleteVideos(ids) {
   if (!ids?.length) return 0;
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
     const store = tx.objectStore(STORE_VIDEOS);
     let removed = 0;
     for (const id of ids) {
       const v = await reqToPromise(store.get(id));
       if (!v) continue;
+      if (v.hidden) await writeHiddenState(tx, id, v.hiddenAt || Date.now());
       await reqToPromise(store.delete(id));
       removed++;
     }
@@ -2060,6 +2111,21 @@ export async function exportUserData() {
     });
     return out;
   });
+  // A channel can have been removed from the local feed while the user's hidden
+  // choices still need to survive a reinstall. Version 2 already accepts
+  // videoStates, so keep these small, recordless states in that field.
+  const savedIds = new Set(videos.map((video) => video.id));
+  const videoStates = await withTx(STORE_SHORTS, 'readonly', async (tx) => {
+    const out = [];
+    await iterate(tx.objectStore(STORE_SHORTS).openCursor(), (cursor) => {
+      const row = cursor.value;
+      if (row.userHiddenAt && !savedIds.has(row.id)) {
+        out.push({ id: row.id, hidden: 1, hiddenAt: row.userHiddenAt });
+      }
+      return true;
+    });
+    return out;
+  });
 
   return {
     format: BACKUP_FORMAT,
@@ -2067,6 +2133,7 @@ export async function exportUserData() {
     exportedAt: Date.now(),
     channels,
     videos,
+    videoStates,
     history,
     durations,
     histoChannels,
@@ -2198,7 +2265,7 @@ function restorableVideo(v) {
 export async function restoreVideos(list, pending = {}) {
   if (!list?.length) return { applied: 0, created: 0, deferred: 0 };
 
-  return withTx(STORE_VIDEOS, 'readwrite', async (tx) => {
+  return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
     const store = tx.objectStore(STORE_VIDEOS);
     let applied = 0;
     let created = 0;
@@ -2207,6 +2274,9 @@ export async function restoreVideos(list, pending = {}) {
     for (const inc of list) {
       if (!inc?.id) continue;
       const prev = await reqToPromise(store.get(inc.id));
+      if (inc.hidden !== undefined) {
+        await writeHiddenState(tx, inc.id, inc.hidden ? inc.hiddenAt || Date.now() : 0);
+      }
 
       if (!prev) {
         const fresh = restorableVideo(inc);
