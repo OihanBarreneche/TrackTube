@@ -205,7 +205,8 @@ function paintState(res) {
   // an anomaly, beside the point the rest of the time.
   const lines = [];
   // First, because it is the figure that was missing when a bad subscription
-  // read switched off 814 channels out of 930 and the feed simply went quiet.
+  // read left 116 channels active out of 592 real subscriptions, and the feed
+  // simply went quiet.
   // Followed against known is the one glance that shows it.
   lines.push(t('diag.channels', {
     active: stats.activeChannels ?? 0, total: stats.channelCount ?? 0,

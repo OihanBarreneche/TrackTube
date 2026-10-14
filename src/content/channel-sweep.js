@@ -10,8 +10,9 @@ export async function collectChannelWindow(channels, {
   // both their tabs: 48 requests take 2.4 s at eight in flight and 1.2 s at
   // sixteen, all 200, no 429, the median request time unchanged at about 330
   // ms — so this is latency bound and the concurrency buys its full factor.
-  // Scaled to 930 channels the window costs about 3100 requests and 362 MB on
-  // the wire, which is 128 s of network at eight and 64 s at sixteen.
+  // Scaled to a 592 channel subscription list the window costs about 2000
+  // requests and 225 MB on the wire, which is some 100 s of network at eight
+  // and 50 s at sixteen.
   // Sixteen is also the figure `innertube-direct.js` already documents as
   // having run 200 requests without a single refusal.
   now = Date.now(), windowDays = 7, concurrency = 16,

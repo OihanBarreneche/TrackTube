@@ -116,9 +116,12 @@ Tests cover both collection and display using isolated mocked sources.
 button is no longer the only way it happens.** What it costs was measured on 14
 October 2026 against YouTube, over 24 real channels and both of their tabs: a
 page of a channel tab weighs **112 KB on the wire and 1.3 MB decompressed**, the
-window takes **1.7 pages per tab**, and a 930 channel list therefore comes to
-about **3100 requests and 362 MB**. At eight in flight that is 128 s of network
-alone, and a real profile took close to five minutes end to end. Most of it was
+window takes **1.7 pages per tab**, so the 592 channels that profile actually
+follows come to about **2000 requests and 225 MB**. At eight in flight that is
+some 100 s of network alone, and it took close to five minutes end to end.
+Extrapolate from the **active** count: the same profile holds 930 rows in its
+channels store, every channel ever seen, and a third of them are subscriptions
+it left years ago and never sweeps. Most of it was
 spent confirming that channels which had published nothing still had published
 nothing.
 
@@ -132,8 +135,8 @@ reads another's answer.
 The slice rotation lives in the tab, on `/feed/subscriptions`, and asks the
 worker through `AUTH_SWEEP_SLICE` for the channels whose deep read is the most
 overdue, a channel never deep read coming before all of them. Eight channels
-every two minutes covers nine hundred in about four hours of browsing for some
-3 MB a slice. The order is the only thing deciding it, and it is an observation
+every two minutes covers six hundred in about two and a half hours of browsing,
+for some 3 MB a slice. The order is the only thing deciding it, and it is an observation
 (`directCoverage.checkedAt`), never popularity or publishing frequency. It
 yields to a manual sweep, because that is somebody waiting.
 

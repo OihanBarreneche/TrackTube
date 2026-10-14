@@ -428,7 +428,8 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
     // mistake costs the videos.
     // A completed pagination is not proof of a complete list, and this is what
     // that costs when it is wrong. Measured on a real profile on 14 October
-    // 2026: 930 channels in the database, **116 still active**. The other 814
+    // 2026: 930 rows in the channels store, which counts every channel ever
+    // seen, and **116 still active** against 592 real subscriptions. The rest
     // had been switched off by reconciliations that reported `complete: true`
     // while handing over a fraction of the account's subscriptions. A
     // deactivated channel is never swept and `ingestAuthenticatedUploads`
@@ -444,8 +445,8 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
     // **The guard applies to the unattended reconciliation only.** It was put
     // on both paths first and that was wrong, in a way that took a day to show
     // and is worth not repeating: the repair that woke a profile's channels
-    // back up left 930 active against a real list of about 500, so the next
-    // reconciliation wanted to switch off 46 % of them, the guard refused, and
+    // back up left 930 active against a real list of 592, so the next
+    // reconciliation wanted to switch off a third of them, the guard refused, and
     // the channels the reader had genuinely left went on filling the feed with
     // nothing able to prune them. A guard that blocks the cleanup of a repair
     // is a deadlock, not a safety net.

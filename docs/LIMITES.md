@@ -28,7 +28,9 @@ and its publications stop arriving silently.
 That guard was not enough. A pagination that runs to the end does not prove
 YouTube returned every subscription, and a list that came back short, called
 itself complete and switched off everything it omitted emptied a real profile:
-measured on 14 October 2026, 930 channels known and 116 still active. Since
+measured on 14 October 2026, 930 channels known — every one ever seen, left
+subscriptions included — of which 592 are real subscriptions and only 116 were
+still active. Since
 1.2.1 the unattended daily reconciliation also refuses any pass that would
 switch off more than a quarter of the active list, and a one-time repair wakes
 the channels an earlier bad read had silenced. The guard is on the unattended
@@ -41,8 +43,8 @@ hour apart that confirmation already requires.
 
 The deep read also runs by itself since 1.3.0, a few channels every couple of
 minutes while the Subscriptions page is open, taking those whose last deep read
-is oldest. A list of nine hundred comes round in about four hours of browsing,
-for roughly 3 MB a pass. It can be turned off in the settings, and the Refresh
+is oldest. Six hundred channels come round in about two and a half hours of
+browsing, for roughly 3 MB a pass. It can be turned off in the settings, and the Refresh
 button then remains the only way it happens.
 
 YouTube’s own Subscriptions page is a collection source since 1.2.0, and the

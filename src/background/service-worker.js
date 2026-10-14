@@ -164,8 +164,9 @@ async function purgeNativeInsertsOnce() {
  *
  * `reconcileChannels` deactivates whatever a list reported `complete` does not
  * contain, and a completed pagination has turned out not to prove a complete
- * list. Measured on a real profile on 14 October 2026: 930 channels, 116 still
- * active, the other 814 switched off without anybody asking. A deactivated
+ * list. Measured on a real profile on 14 October 2026: 930 rows in the channels
+ * store, which is every channel ever seen, and 116 still active against 592 real
+ * subscriptions — the rest switched off without anybody asking. A deactivated
  * channel is not swept and cannot be created into, so its publications stop
  * arriving and the feed merely looks quiet — the failure this extension exists
  * to prevent, produced by the extension itself.
@@ -2241,9 +2242,10 @@ route({
   /**
    * The next channels whose window read is the most overdue.
    *
-   * The refresh button read all 930 channels on every click. Measured on 14
-   * October 2026 that is about 3100 requests and 362 MB, some two minutes of
-   * network even at sixteen in flight, and the greater part of it spent
+   * The refresh button read every active channel on every click. Measured on 14
+   * October 2026 against a 592 channel subscription list, that is about 2000
+   * requests and 225 MB, near a minute of network even at sixteen in flight,
+   * and the greater part of it spent
    * confirming that channels which published nothing still have published
    * nothing. The same work done a slice at a time, while a YouTube tab is
    * open, costs nothing anybody waits for and keeps the whole list covered.

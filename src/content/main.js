@@ -545,8 +545,8 @@ async function runImport() {
  * The window sweep, a slice at a time, while a YouTube tab is open.
  *
  * The refresh button read every channel on every press: measured on 14 October
- * 2026 over a 930 channel list, about 3100 requests and 362 MB, some two
- * minutes of network even at sixteen in flight, and most of it spent
+ * 2026 over a 592 channel subscription list, about 2000 requests and 225 MB,
+ * near a minute of network even at sixteen in flight, and most of it spent
  * confirming that channels which published nothing still have. Nobody should
  * have to sit in front of that, and nobody should have to press anything for
  * their subscriptions to arrive.
@@ -554,8 +554,8 @@ async function runImport() {
  * So the same work runs in the background, in slices the size of a breath, and
  * the cards appear as they are found. The worker hands out the channels whose
  * deep read is the most overdue, so the whole list rotates on its own: eight
- * channels every two minutes covers nine hundred in about four hours of
- * browsing, for roughly 3 MB a slice.
+ * channels every two minutes covers six hundred in about two and a half hours
+ * of browsing, for roughly 3 MB a slice.
  *
  * It yields to the button. A manual sweep is somebody waiting, and the two
  * reading the same channels at once would only slow that down.
