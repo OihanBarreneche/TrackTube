@@ -19,7 +19,7 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.1.2, audited in October 2026 for a first public release: the README is
+Version 1.2.0, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are down to `storage`,
 `unlimitedStorage`, `alarms` and `https://www.youtube.com/*`, and the welcome
 flow is three steps rather than six.
@@ -157,10 +157,36 @@ and the last two are reported with their channel names, because only the reader
 knows whether a channel they are not following is a recommendation to ignore or
 a subscription the import lost.
 
-**The native subscriptions feed never creates a video.** It enriches and
-measures; it passes `allowInsert: false` to `upsertVideos`. Automatic collection
-creates from `UULF` Atom. A manual authenticated sweep may also create from a
-channel's actual Videos tab. The grid card carries the relative publication
+**The native subscriptions feed creates videos since 1.2.0, and the rule that
+said it never does is retired.** It did enrich and measure only, passing
+`allowInsert: false`, on the grounds that the page carries Shorts and nothing in
+its DOM rules them out. That reason was written before 0.89.0 brought
+`videoClassifications`, the `UUSH` exclusions and player verification: the
+verdict no longer comes from the card, so the card no longer has to be refused.
+What the source is worth is the delay — it is the only one that sees a
+publication at the moment YouTube does, where an Atom read waits for its
+channel's turn and the manual sweep waits for a click, and it was measuring what
+it was forbidden to collect, so a video could be observed there, filed by the
+audit as missing, and still never reach the grid.
+
+The enrichment pass stays `allowInsert: false`. Creation is a second pass that
+writes nothing itself: it groups the cards by channel and hands them to
+`ingestAuthenticatedUploads`, the function the manual sweep already creates
+through, so one policy governs both paths rather than two that drift. Three
+refusals follow from it and none may be loosened — a channel that is not
+followed and active is refused outright, which is what keeps out the
+recommendations YouTube mixes into that page; a player record that does not
+positively say "not a Short" inserts nothing and is retried; and a video with no
+duration is deferred rather than stored invisible.
+
+**Its source field is `native-verified`, never `native`.** `purgeNativeInserted`
+deletes every row whose source is exactly `native` — it is the one-time cleanup
+of the unscreened inserts this harvest used to make, Shorts among them. It has
+already run on installed profiles, but it runs at startup on a fresh one, and
+reusing the word would arm a cleanup against the rows it is meant to protect.
+
+Automatic collection also creates from `UULF` Atom, and a manual authenticated
+sweep from a channel's actual Videos tab. The grid card carries the relative publication
 time, while its lockup carries the duration; merge both representations by video
 id. Tab membership is provisional. Cards at or below 200 seconds require player
 verification before insertion; duration prioritises verification, never
@@ -180,7 +206,13 @@ public channel read silently sends Opera back to stale RSS.
 recent row without a duration; the strict display guard then withholds it. Such
 a row must not be skipped by authenticated enrichment, and
 `ingestAuthenticatedUploads` must update it instead of treating every existing
-primary key as finished. Explicit Members-only badges are stored in
+primary key as finished. Since 1.2.0 that function also refuses to *create* one:
+a player record carrying no duration, on a video that is neither live nor
+upcoming, is deferred and retried rather than inserted. Inserting it produced a
+video that existed in the database and could never reach the grid, which is the
+failure mode that makes a publication look lost rather than late, and the test
+is the one `videoIncomplete` and `factsFromVideosTab` already apply.
+Explicit Members-only badges are stored in
 `videoClassifications` as `membersOnly`, separately from `isShort`, so Atom
 cannot resurrect them and the reverse audit never calls them Shorts. An
 unbadged card clears that flag when a Members-first publication becomes public.

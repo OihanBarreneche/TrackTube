@@ -45,7 +45,7 @@ import { triageFigures } from '../lib/triage-order.js';
 import {
   estimateDailyCost, computeInterval, defaultCadence, CACHE_TTL,
 } from './scheduler.js';
-import { median } from '../lib/util.js';
+import { median, pool } from '../lib/util.js';
 import { FEED_PAGE_OPTIONS, pick } from '../lib/feed-options.js';
 import { log } from '../lib/log.js';
 
@@ -70,6 +70,14 @@ const ALARM_PERIOD_MAX = 10;
 
 /** Last harvest report, for diagnosis from the popup. */
 const META_LAST_HARVEST = 'harvest.last';
+
+/**
+ * A subscriptions page card does not have to come from a subscription:
+ * YouTube mixes its recommendations into it, which is the reason the reverse
+ * audit only judges channels the extension follows. A card whose channel id is
+ * not even well formed is discarded before it can cost a lookup.
+ */
+const RE_CHANNEL_ID = /^UC[\w-]{22}$/;
 
 // ---------------------------------------------------------------------------
 // Lifecycle
@@ -2041,10 +2049,14 @@ route({
   },
 
   /**
-   * Native feed harvest: it serves two purposes at once.
+   * Native feed harvest: it serves three purposes at once.
    *  - enrichment, because YouTube gives the durations RSS does not have;
    *  - measurement, because knowing what YouTube showed is the only way to
-   *    quantify what it hides.
+   *    quantify what it hides;
+   *  - collection, because this is the only source that sees a publication at
+   *    the moment YouTube does. It used to measure what it was not allowed to
+   *    collect, which is how a video could be observed here, recorded in the
+   *    audit as missing, and still never reach the grid.
    */
   [MSG.NATIVE_HARVEST]: async ({ videos, diagnostic, key = null }) => {
     // Another account's native feed does not talk about our channels: it would
@@ -2067,22 +2079,84 @@ route({
     // TrackTube. It lives in a separate audit store and can never feed the grid.
     const observed = await recordNativeVideos(tagged, now);
 
-    // The native feed contains Shorts, and nothing in its DOM makes it possible
-    // to rule them out for certain: by default this harvest therefore inserts
-    // nothing, it enriches and measures.
-    //
-    // One exception, and one only: lives and premieres. The lives feed (`UULV`)
-    // now reports them, but without saying which are running or when a premiere
-    // starts — only the native feed carries those two facts, and they decide how
-    // the video is displayed. Since those videos are formally identified by a
-    // badge or a start date, letting them in does not reopen the door to Shorts.
+    // Lives and premieres are inserted from the DOM alone. The lives feed
+    // (`UULV`) reports them, but without saying which are running or when a
+    // premiere starts — only the native feed carries those two facts, and they
+    // decide how the video is displayed. Those videos are formally identified
+    // by a badge or a start date, so letting them in opens no door to Shorts.
     const broadcasts = tagged.filter((v) => v.isLive || v.isUpcoming);
     const ordinary = tagged.filter((v) => !v.isLive && !v.isUpcoming);
 
+    // This pass stays update only, and it is the one that enriches: it carries
+    // the duration and the playback progress onto rows that already exist,
+    // whatever their channel, without ever creating anything.
     const written = await upsertVideos(ordinary, { allowInsert: false });
     const lives = broadcasts.length
       ? await upsertVideos(broadcasts, { allowInsert: true })
       : { inserted: 0, updated: 0 };
+
+    // Creation, which this harvest was forbidden for a long time. The reason
+    // given was that the page carries Shorts and nothing in its DOM rules them
+    // out for certain; that is still true of the DOM, and no longer true of the
+    // question, because a verdict now comes from the UUSH list and the player's
+    // canonical URL rather than from the card. What this source is worth is the
+    // delay: it is the only one that sees a publication at the moment YouTube
+    // does, where a feed read waits for its channel's turn and the manual sweep
+    // waits for a click.
+    //
+    // No screening is written here, deliberately. The videos go through the
+    // very function the channel sweep creates with, so one policy governs both
+    // paths instead of two that drift:
+    //   - a channel that is not followed and active is refused outright, which
+    //     is what keeps YouTube's recommendations out of the grid;
+    //   - a player record that does not positively say "not a Short" inserts
+    //     nothing and is retried later;
+    //   - a video with no duration is deferred rather than stored invisible.
+    // Grouping by channel is what that function expects, and it costs nothing:
+    // the tab only sends cards whose contents changed since the last pass.
+    //
+    // The source is `native-verified` and emphatically not `native`:
+    // `purgeNativeInserted` deletes every row whose source is exactly that, and
+    // it is the one-time cleanup of the unscreened inserts this harvest used to
+    // make, Shorts included. It has already run on installed profiles, but on a
+    // fresh one it runs at startup, and reusing the word would arm a cleanup
+    // against the rows it is meant to protect.
+    const byChannel = new Map();
+    for (const video of ordinary) {
+      if (!RE_CHANNEL_ID.test(video.channelId ?? '')) continue;
+      const batch = byChannel.get(video.channelId);
+      if (batch) batch.push(video);
+      else byChannel.set(video.channelId, [video]);
+    }
+    // Four channels at a time. A channel already holding all of its cards with
+    // their durations returns before touching the network, so in steady state
+    // this costs nothing; the first pass after an install is the one that has a
+    // player record to spend per video, and waiting for them one after another
+    // would hold the new cards back for as long as there are videos to admit.
+    const created = {
+      inserted: 0, deferred: 0, shorts: 0, errors: 0, channels: byChannel.size,
+    };
+    // `pool` reports each job as {ok, value} or {ok, error}: one channel
+    // failing must not cost the harvest the others, nor the enrichment and the
+    // audit measurement already done above.
+    const outcomes = await pool([...byChannel], 4, ([id, batch]) =>
+      ingestAuthenticatedUploads(id, batch, { source: 'native-verified' }));
+    for (const outcome of outcomes) {
+      if (!outcome?.ok) { created.errors++; continue; }
+      created.inserted += outcome.value?.inserted ?? 0;
+      created.deferred += outcome.value?.deferred ?? 0;
+      created.shorts += outcome.value?.shorts ?? 0;
+    }
+    // The cards appear on their own, which is the whole report this owes the
+    // reader: no banner, no sentence.
+    announceFeedUpdated(created.inserted);
+
+    // Kept beside the extraction counters, so the diagnostics can tell a page
+    // that yielded nothing from one whose videos were all refused, and say on
+    // which of the three grounds.
+    if (diagnostic) {
+      await metaSet(META_LAST_HARVEST, { ...diagnostic, created, at: Date.now() });
+    }
 
     const coverage = await recordNativeCoverage({
       oldestPublishedAt: observed.oldestPublishedAt,
@@ -2098,7 +2172,10 @@ route({
     }
     const avatarsFilled = await fillMissingAvatars(avatars);
 
-    return { ...written, observed, coverage, avatarsFilled, livesInserted: lives.inserted };
+    return {
+      ...written, observed, coverage, avatarsFilled,
+      livesInserted: lives.inserted, created,
+    };
   },
 
   [MSG.AUDIT_RUN]: async ({ windowDays }) => ({ report: await runAudit({ windowDays }) }),

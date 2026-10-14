@@ -923,7 +923,7 @@ async function sweepChannel(channel, known, dateBudgetLeft, spend, tally,
  * into a silent deferral whenever YouTube refused the service worker.
  */
 export async function ingestAuthenticatedUploads(
-  channelId, directVideos, { backfilled = false } = {},
+  channelId, directVideos, { backfilled = false, source = 'innertube-authenticated' } = {},
 ) {
   const channel = await getChannel(channelId);
   if (!channel?.active) return { inserted: 0, deferred: 0, ignored: true };
@@ -982,6 +982,12 @@ export async function ingestAuthenticatedUploads(
     // An absent canonical URL is not proof that this is a normal video. It is
     // retried on the next sweep instead of weakening the no-Short guarantee.
     if (fact.isShort !== false) { deferred++; continue; }
+    // A row with no duration is withheld by the display guard, so inserting one
+    // creates a video that exists in the database and can never reach the grid
+    // — the failure mode that makes a publication look lost rather than late.
+    // The test is the one `videoIncomplete` and `factsFromVideosTab` already
+    // apply, a broadcast being the case where no duration is the right answer.
+    if (!(fact.durationSec > 0) && !fact.isLive && !fact.isUpcoming) { deferred++; continue; }
     const checkedAt = Date.now();
     await recordVideoClassification(
       id,
@@ -997,7 +1003,7 @@ export async function ingestAuthenticatedUploads(
       id,
       channelId: channel.id,
       channelTitle: channel.title,
-      source: 'innertube-authenticated',
+      source,
     });
   }
 
