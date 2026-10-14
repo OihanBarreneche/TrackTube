@@ -205,10 +205,20 @@ navigateur distinct pour un second compte.
   n'être pas encore classée, et une requête qui échoue n'exclut rien plutôt que
   de deviner. Rien n'est jamais classé d'après sa durée.
 - **La collecte automatique est superficielle.** Elle lit le flux récent de
-  chaque chaîne, à intervalle régulier. Le bouton **Rafraîchir** va plus loin :
-  il parcourt les onglets Vidéos et En direct de chaque chaîne active sur les
-  sept derniers jours, et signale une couverture partielle quand quelque chose
-  l'a arrêté.
+  chaque chaîne, à intervalle régulier. La lecture profonde, qui parcourt les
+  onglets Vidéos et En direct de chaque chaîne active sur les sept derniers
+  jours, se fait de deux façons : le bouton **Rafraîchir** traite toute la
+  liste d'un coup, et tant que la page Abonnements est ouverte quelques chaînes
+  sont vérifiées toutes les deux minutes, si bien que la liste défile d'elle
+  même. Dans les deux cas, une couverture partielle est signalée quand une
+  chaîne n'a pas pu être lue. Le passage en arrière plan se désactive dans les
+  réglages.
+- **Trois sources alimentent la liste, et seules les chaînes suivies y entrent.**
+  Le flux propre à chaque chaîne, la lecture profonde ci dessus, et la page
+  Abonnements de YouTube, la seule qui voie une publication au moment où
+  YouTube la voit. Une carte venant d'une chaîne que vous ne suivez pas est
+  refusée à la collecte puis de nouveau au dessin de la grille, parce que cette
+  page mélange des recommandations.
 - **Le diagnostic inverse est une comparaison, pas un certificat.** Il dit ce
   que la page de YouTube a montré et que la base ne contient pas. Il ne peut pas
   prouver que l'un des deux côtés est complet.

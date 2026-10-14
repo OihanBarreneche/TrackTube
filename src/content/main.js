@@ -589,7 +589,12 @@ function startBackgroundSweep() {
   if (sliceTimer) return () => {};
   // Nothing in the first seconds of a page load: that is when the grid is
   // painting and when the user is actually looking at it.
-  const begin = setTimeout(() => {
+  const begin = setTimeout(async () => {
+    // Read once, here, rather than on every slice: the cost is traffic nobody
+    // asked for, so somebody on a metered connection has to be able to say no,
+    // and the Refresh button still does the same work on demand.
+    const stored = await chrome.storage.local.get('ytfeed:settings').catch(() => null);
+    if (stored?.['ytfeed:settings']?.bgSweep === false) return;
     sweepOneSlice();
     sliceTimer = setInterval(sweepOneSlice, SLICE_INTERVAL_MS);
   }, SLICE_FIRST_DELAY_MS);

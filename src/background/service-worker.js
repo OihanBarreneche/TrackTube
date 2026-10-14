@@ -2290,8 +2290,20 @@ route({
     const same = await rightAccount(key);
     const outcome = result && typeof result === 'object' ? result : {};
     const failed = !same || outcome.ok === false;
-    const partial = failed || (outcome.errors ?? 0) > 0 || (outcome.deferred ?? 0) > 0
+    // Two different questions, and conflating them put a warning on screen
+    // after a flawless sweep. `partial` is for the diagnostics and means "not
+    // everything was certified", deferrals included. `channelsMissed` is the
+    // one worth telling the reader about: a channel that could not be read.
+    //
+    // A deferral is one video whose classification did not settle, and it
+    // settles by itself on the next pass. Measured on a real profile: 116
+    // channels out of 116, zero errors, one deferral — and "partial
+    // collection, check the diagnostics". A sentence that cries wolf on a
+    // sweep that went perfectly is worse than no sentence, because the one
+    // time it means something nobody will read it.
+    const channelsMissed = failed || (outcome.errors ?? 0) > 0
       || (outcome.partial ?? 0) > 0 || (outcome.checked ?? 0) < safeTotal;
+    const partial = channelsMissed || (outcome.deferred ?? 0) > 0;
     if (same) await metaSet('sync.channelWindow', { ...outcome, at: Date.now(), partial });
     const completion = {
       progressId: String(progressId ?? '').slice(0, 80),
@@ -2300,6 +2312,7 @@ route({
       finished: true,
       failed,
       partial,
+      channelsMissed,
       result: outcome,
       error: !same ? 'err.autrecompte' : (outcome.error || outcome.reason || null),
     };

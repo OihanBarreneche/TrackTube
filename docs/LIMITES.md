@@ -1,6 +1,6 @@
-# Known limits — 1.1.1
+# Known limits — 1.4.0
 
-Updated October 9, 2026. What follows is what TrackTube does not promise, and
+Updated October 15, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
 they name, and YouTube owes nobody stability on any of them.
 
@@ -22,8 +22,42 @@ on 8 October 2026, `Co7jh46dJ7w` reached the reverse audit that way.
 
 A subscription list read back from YouTube only deactivates channels when it
 came back complete. A partial read — an interrupted pagination, a page that
-failed — now deactivates nothing, because a deactivated channel is no longer
-swept and its publications stop arriving silently.
+failed — deactivates nothing, because a deactivated channel is no longer swept
+and its publications stop arriving silently.
+
+That guard was not enough. A pagination that runs to the end does not prove
+YouTube returned every subscription, and a list that came back short, called
+itself complete and switched off everything it omitted emptied a real profile:
+measured on 14 October 2026, 930 channels known and 116 still active. Since
+1.2.1 the unattended daily reconciliation also refuses any pass that would
+switch off more than a quarter of the active list, and a one-time repair wakes
+the channels an earlier bad read had silenced. The guard is on the unattended
+path only: a manual import is somebody watching the result, and it takes effect
+at once, otherwise it could never prune what the repair over-woke.
+
+Waking channels back up reactivates ones genuinely unsubscribed from. They are
+switched off again by the next believable list, after the two observations an
+hour apart that confirmation already requires.
+
+The deep read also runs by itself since 1.3.0, a few channels every couple of
+minutes while the Subscriptions page is open, taking those whose last deep read
+is oldest. A list of nine hundred comes round in about four hours of browsing,
+for roughly 3 MB a pass. It can be turned off in the settings, and the Refresh
+button then remains the only way it happens.
+
+YouTube’s own Subscriptions page is a collection source since 1.2.0, and the
+only one that sees a publication the moment YouTube does. It carries Shorts and
+recommendations, so nothing from it is inserted on the strength of the card: a
+channel that is not followed and active is refused outright, a player record
+that does not positively say “not a Short” inserts nothing and is retried, and
+a video with no known duration is deferred rather than stored where the feed
+could never show it. Its reader depends on YouTube’s page markup and can stop
+returning anything without failing; the diagnostics say so when it reads no card
+at all.
+
+A video is also checked against the followed channels when the grid is drawn,
+not only when it is collected: a row outlives the subscription that brought it
+in, and nothing from a channel you no longer follow is painted.
 
 Manual refresh reads each active channel's Videos and Live grids for seven days
 with an extra day's margin. It is bounded by 1,200 entries and forty pages per

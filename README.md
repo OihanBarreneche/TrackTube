@@ -191,9 +191,17 @@ second account.
   published minutes ago may not be classified yet, and a failed request excludes
   nothing rather than guessing. Nothing is ever classified from its duration.
 - **Automatic collection is shallow.** It reads each channel's recent feed on a
-  schedule. The **Refresh** button goes further, walking the Videos and Live
-  tabs of every active channel over the last seven days, and reports partial
-  coverage when something stopped it.
+  schedule. The deeper read, which walks the Videos and Live tabs of every
+  active channel over the last seven days, happens two ways: the **Refresh**
+  button does the whole list at once, and while the Subscriptions page is open
+  a few channels are checked every couple of minutes so the list comes round on
+  its own. Either way it reports partial coverage when a channel could not be
+  read. The background pass can be turned off in the settings.
+- **Three sources feed the list, and only channels you follow get in.** Each
+  channel's own feed, the deeper read above, and YouTube's own Subscriptions
+  page, which is the only one that sees a publication the moment YouTube does.
+  A card from a channel you do not follow is refused when collected and again
+  when the grid is drawn, because that page mixes recommendations in.
 - **The reverse diagnostic is a comparison, not a certificate.** It tells you
   what YouTube's own page showed that the database does not hold. It cannot
   prove that either side is complete.

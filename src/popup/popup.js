@@ -204,6 +204,12 @@ function paintState(res) {
   // The technical detail goes down into the diagnostics: useful to understand
   // an anomaly, beside the point the rest of the time.
   const lines = [];
+  // First, because it is the figure that was missing when a bad subscription
+  // read switched off 814 channels out of 930 and the feed simply went quiet.
+  // Followed against known is the one glance that shows it.
+  lines.push(t('diag.channels', {
+    active: stats.activeChannels ?? 0, total: stats.channelCount ?? 0,
+  }));
   lines.push(channelWindow ? t('diag.channelWindow', {
     days: channelWindow.windowDays ?? 7, checked: channelWindow.checked ?? 0, total: channelWindow.total ?? 0,
     date: new Date(channelWindow.at).toLocaleString(bcp47(), { dateStyle: 'short', timeStyle: 'short' }),
@@ -216,10 +222,20 @@ function paintState(res) {
     })
     : t('diag.harvest.never'));
   if (lastHarvest) {
-    lines.push(t('diag.harvest.last', {
+    // Zero links read is its own diagnosis and deserves saying so plainly: the
+    // page was there and nothing was extracted, which is a broken reader, not
+    // an empty feed. It is how a whole collection source went unnoticed.
+    lines.push(lastHarvest.linksFound ? t('diag.harvest.last', {
       links: lastHarvest.linksFound,
       enriched: lastHarvest.enrichedByPolymer,
-    }));
+    }) : t('diag.harvest.blind'));
+    if (lastHarvest.created) {
+      lines.push(t('diag.harvest.created', {
+        n: lastHarvest.created.inserted ?? 0,
+        deferred: lastHarvest.created.deferred ?? 0,
+        shorts: lastHarvest.created.shorts ?? 0,
+      }));
+    }
   }
   if (state.rateLimitedUntil > Date.now()) {
     lines.push(t('diag.paused', {
@@ -899,6 +915,7 @@ const FIELDS = {
   sweepMinutes: { id: 'set-sweep-minutes', type: 'int', fallback: 10 },
   slowDormant: { id: 'set-slow-dormant', type: 'bool', fallback: true },
   syncLives: { id: 'set-sync-lives', type: 'bool', fallback: true },
+  bgSweep: { id: 'set-bg-sweep', type: 'bool', fallback: true },
   minDurationSec: { id: 'set-min-duration', type: 'int', fallback: 0 },
   maxAgeDays: { id: 'set-max-age', type: 'int', fallback: 0 },
 

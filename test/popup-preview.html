@@ -46,7 +46,11 @@
     'sync:state': {
       ok: true,
       state: { lastTickAt: Date.now() - 12 * 60 * 1000, uulfAlarm: { raised: false } },
-      stats: { activeChannels: 412, visible: 1863, hidden: 5209, total: 7072 },
+      // `channelCount` counts every channel ever seen, `activeChannels` those
+      // still followed. The gap between them is the whole point of the line
+      // the diagnostics now open with, so the bench has to show a realistic
+      // one rather than leaving it at zero.
+      stats: { activeChannels: 412, channelCount: 538, visible: 1863, hidden: 5209, total: 7072 },
       cost: { requestsPerDay: 2840, bytesPerDay: 45e6 },
       cadence: { effective: 'auto', chaines: 412, medianIntervalMs: 95 * 60 * 1000, avecLives: 23 },
       harvest: { count: 48, oldestPublishedAt: Date.now() - 3 * 86400e3 },
