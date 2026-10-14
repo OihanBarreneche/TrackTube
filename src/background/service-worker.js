@@ -15,7 +15,7 @@ import {
 import { runAudit, runReverseAudit, recordNativeCoverage, getNativeCoverage } from './audit.js';
 import {
   openDb, getStats, setHidden, setWatched,
-  reconcileChannels, getAllChannels, upsertVideos, getChannelVideos,
+  reconcileChannels, reactivateAllChannels, getAllChannels, upsertVideos, getChannelVideos,
   getFeedCounts, hideChannelVideos, fillMissingAvatars, dropChannelAvatars,
   dropSharedChannelAvatars, setStarred,
   purgeNativeInserted, exportUserData, importUserData, getFeedPulse,
@@ -87,6 +87,7 @@ const RE_CHANNEL_ID = /^UC[\w-]{22}$/;
 // included: they are data, and renaming one would make its one-time maintenance
 // pass look undone and run again on every existing profile.
 const META_PURGED_NATIVE = 'maintenance.purgedNativeInserts';
+const META_CHANNELS_WOKEN = 'maintenance.channelsWoken';
 const META_SESSIONS_RESOLVED = 'maintenance.seancesResolues';
 const META_SHARED_AVATARS_CLEARED = 'maintenance.sharedAccountAvatars08813';
 
@@ -128,6 +129,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   await openDb();
   await ensureAlarm();
   await purgeNativeInsertsOnce();
+  await reactivateSilencedChannelsOnce();
   await resolveOrphanSessionsOnce();
   if (details.reason === 'install') await openWelcome();
 });
@@ -155,6 +157,34 @@ async function purgeNativeInsertsOnce() {
   const removed = await purgeNativeInserted();
   await metaSet(META_PURGED_NATIVE, true);
   if (removed) log.info(`${removed} videos from the native feed removed (Shorts among them)`);
+}
+
+/**
+ * One-off repair of the channels a bad subscription read switched off.
+ *
+ * `reconcileChannels` deactivates whatever a list reported `complete` does not
+ * contain, and a completed pagination has turned out not to prove a complete
+ * list. Measured on a real profile on 14 October 2026: 930 channels, 116 still
+ * active, the other 814 switched off without anybody asking. A deactivated
+ * channel is not swept and cannot be created into, so its publications stop
+ * arriving and the feed merely looks quiet — the failure this extension exists
+ * to prevent, produced by the extension itself.
+ *
+ * `reconcileChannels` now refuses a pass that would switch off a large share of
+ * the list, but that only stops it happening again: an import reactivates the
+ * channels it is given and nothing reactivates the ones a bad read left out, so
+ * an already emptied profile stays empty. Hence this, once per profile.
+ *
+ * It wakes channels genuinely unsubscribed from too, and that is the accepted
+ * side of the trade: the next believable list switches them off again, after
+ * two observations an hour apart, while leaving them asleep costs every video
+ * they publish.
+ */
+async function reactivateSilencedChannelsOnce() {
+  if (await metaGet(META_CHANNELS_WOKEN, false)) return;
+  const woken = await reactivateAllChannels();
+  await metaSet(META_CHANNELS_WOKEN, true);
+  if (woken) log.info(`${woken} channels switched back on and due immediately`);
 }
 
 /**
@@ -2040,6 +2070,16 @@ route({
     if (complete && result.deactivatedIds?.length) {
       for (const id of result.deactivatedIds) purged += await deleteChannelVideos(id);
       log.info(`${result.deactivatedIds.length} channel(s) left elsewhere, ${purged} videos removed`);
+    }
+
+    // Said loudly, because it is the shape of the defect that emptied a real
+    // profile: the list came back short, called itself complete, and everything
+    // it left out was switched off. Nothing is deactivated and nothing is
+    // purged in that case, so the only trace would otherwise be a zero.
+    if (result.massWipeRefused) {
+      log.warn('Subscription list refused: it would have deactivated '
+        + `${result.massWipeRefused.wouldDeactivate} of ${result.massWipeRefused.active} `
+        + `active channels, from a list of ${result.total}`);
     }
 
     await applyDefaultCadence(result.total);

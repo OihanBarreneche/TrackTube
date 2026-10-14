@@ -301,6 +301,14 @@ export async function putChannel(channel) {
  *
  * @param {Array<{id: string, title?: string, avatarUrl?: string}>} imported
  */
+/**
+ * Share of the active list a single reconciliation may switch off, and the size
+ * below which that share says nothing. See the reasoning inside
+ * `reconcileChannels`.
+ */
+const MAX_DEACTIVATION_SHARE = 0.25;
+const MIN_ACTIVE_FOR_WIPE_GUARD = 20;
+
 export async function reconcileChannels(imported, { complete = false, confirmAbsent = false } = {}) {
   const now = Date.now();
   const seen = new Set(imported.map((c) => c.id));
@@ -352,9 +360,35 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
     // extension cannot afford. Keeping a channel that really was unsubscribed
     // costs one feed read per sweep until the next complete list; the opposite
     // mistake costs the videos.
+    // A completed pagination is not proof of a complete list, and this is what
+    // that costs when it is wrong. Measured on a real profile on 14 October
+    // 2026: 930 channels in the database, **116 still active**. The other 814
+    // had been switched off by reconciliations that reported `complete: true`
+    // while handing over a fraction of the account's subscriptions. A
+    // deactivated channel is never swept and `ingestAuthenticatedUploads`
+    // refuses it outright, so its publications simply stopped arriving, with
+    // nothing on screen to say so.
+    //
+    // Nobody unsubscribes from four fifths of their list in one day. A pass
+    // that would is therefore not a list of departures, it is a bad read, and
+    // it is refused whole: the condition is on the share of the active list,
+    // not on an absolute count, so it holds for twenty subscriptions as for
+    // nine hundred. A floor is needed under it because a small list makes any
+    // share look alarming — leaving three channels out of five is an ordinary
+    // afternoon's pruning.
+    //
+    // Refusing costs one feed read per sweep for a channel that really was
+    // unsubscribed, until a sane list turns up. The opposite mistake costs the
+    // videos, which is the one failure this extension cannot afford.
+    const activeCount = existing.filter((c) => c.active).length;
+    const wouldDeactivate = existing.filter((c) => c.active && !seen.has(c.id)).length;
+    const massWipe = complete
+      && activeCount >= MIN_ACTIVE_FOR_WIPE_GUARD
+      && wouldDeactivate > activeCount * MAX_DEACTIVATION_SHARE;
+
     const deactivatedIds = [];
     let awaitingConfirmation = 0;
-    if (complete) {
+    if (complete && !massWipe) {
       for (const prev of existing) {
         if (!seen.has(prev.id) && prev.active) {
           // A completed pagination is not proof that YouTube returned every
@@ -380,8 +414,46 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
     return {
       added, updated, deactivated, deactivatedIds, awaitingConfirmation, total: seen.size,
       // Said out loud so the caller never has to infer it from a zero.
-      deactivationSkipped: !complete,
+      deactivationSkipped: !complete || massWipe,
+      // And the refusal is named, because "nothing was deactivated" and "we
+      // refused to deactivate eight hundred channels" are not the same event
+      // and only the second one needs looking at.
+      massWipeRefused: massWipe ? { active: activeCount, wouldDeactivate } : null,
     };
+  });
+}
+
+/**
+ * Switches every channel back on.
+ *
+ * The repair for a profile already emptied by the above, which no ordinary path
+ * undoes: an import only reactivates the channels it was given, so the ones a
+ * bad read left out stay off for good, and a feed goes on looking merely quiet.
+ *
+ * Reactivating a channel that really was unsubscribed is deliberately accepted
+ * here. It is not permanent: the next reconciliation given a believable list
+ * switches it off again, and `confirmAbsent` already makes that take two
+ * observations an hour apart, so the mistake costs a day of feed reads where
+ * the one it undoes costs every video.
+ *
+ * @returns {Promise<number>} how many channels were switched back on.
+ */
+export async function reactivateAllChannels() {
+  return withTx(STORE_CHANNELS, 'readwrite', async (tx) => {
+    const store = tx.objectStore(STORE_CHANNELS);
+    const existing = await reqToPromise(store.getAll());
+    let woken = 0;
+    for (const channel of existing) {
+      if (channel.active) continue;
+      channel.active = 1;
+      channel.missingSince = 0;
+      // Due immediately: the point of the repair is the videos that were not
+      // collected while it slept, not the next scheduled turn.
+      channel.nextDueAt = 0;
+      await reqToPromise(store.put(channel));
+      woken++;
+    }
+    return woken;
   });
 }
 

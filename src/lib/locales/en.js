@@ -15,7 +15,7 @@ export const en = {
   'docs.repo': 'Report a problem or suggest an idea',
   'pop.sync.partial': 'Partial collection · {checked} channels · {inserted} new videos',
   'pop.sync.timeout': 'Collection continues in the background. Check diagnostics before retrying.',
-  'feed.sync.partial': 'Partial collection — check diagnostics',
+  'feed.sync.partial': 'Partial collection · {checked}/{total} channels · {deferred} pending',
   'diag.channelWindow': 'Channel check over {days} days: {checked}/{total} · {date} · {status}',
   'diag.channelWindow.partial': 'partial',
   'diag.channelWindow.complete': 'finished',

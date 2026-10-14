@@ -19,7 +19,7 @@ export const fr = {
   'docs.repo': 'Signaler un problème ou proposer une idée',
   'pop.sync.partial': 'Collecte partielle · {checked} chaînes · {inserted} nouvelles vidéos',
   'pop.sync.timeout': 'La collecte continue en arrière-plan. Vérifie les diagnostics avant de réessayer.',
-  'feed.sync.partial': 'Collecte partielle — vérifie les diagnostics',
+  'feed.sync.partial': 'Collecte partielle · {checked}/{total} chaînes · {deferred} en attente',
   'diag.channelWindow': 'Vérification des chaînes sur {days} jours : {checked}/{total} · {date} · {status}',
   'diag.channelWindow.partial': 'partielle',
   'diag.channelWindow.complete': 'terminée',

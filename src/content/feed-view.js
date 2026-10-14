@@ -1073,9 +1073,15 @@ async function runManualRefresh() {
     if (!res.ok) { freshness.textContent = t('toast.refresh.failed', { error: t(res.error) }); return; }
 
     let partial = Boolean(res.result?.directUnavailable || res.result?.errors || res.result?.deferred || res.result?.aborted);
+    // Kept so the message can give figures. "Partial collection, check the
+    // diagnostics" sent the reader to a page to find out that one video out of
+    // a hundred and sixteen covered channels was waiting on a classification —
+    // a sentence that alarms without informing is worse than no sentence.
+    let detail = res.result ?? null;
     if (res.result?.started) {
       const finished = await completion;
       partial = finished.partial === true;
+      detail = finished.result ?? detail;
       if (finished.failed) {
         freshness.textContent = t('toast.refresh.failed', { error: t(finished.error) });
         return;
@@ -1088,7 +1094,13 @@ async function runManualRefresh() {
     await prependNewVideos();
     setRefreshProgress(1);
     await refreshStats();
-    if (partial) freshness.textContent = t('feed.sync.partial');
+    if (partial) {
+      freshness.textContent = t('feed.sync.partial', {
+        checked: detail?.checked ?? 0,
+        total: detail?.total ?? 0,
+        deferred: (detail?.deferred ?? 0) + (detail?.errors ?? 0),
+      });
+    }
   } catch (err) {
     freshness.textContent = t('toast.refresh.failed', { error: err.message });
   } finally {
