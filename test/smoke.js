@@ -14,7 +14,9 @@ import * as db from '../src/lib/db.js';
 import * as sch from '../src/background/scheduler.js';
 import { parseAtomFeed, feedFingerprint, feedUrl, uploadsPlaylistId } from '../src/lib/rss.js';
 import { parseSubscriptionsCsv, planApplication, MODES } from '../src/lib/subscriptions-csv.js';
-import { FEED_PAGE_OPTIONS, pick, destructuredParamNames } from '../src/lib/feed-options.js';
+import {
+  FEED_PAGE_OPTIONS, FEED_PAGE_INTERNAL_OPTIONS, pick, destructuredParamNames,
+} from '../src/lib/feed-options.js';
 import * as tri from '../src/lib/triage-order.js';
 import * as itp from '../src/lib/innertube-parse.js';
 import { decodeEntities, parseCompactCount, videoIncomplete } from '../src/lib/util.js';
@@ -1550,9 +1552,21 @@ function testFeedOptionsContract(check) {
   check('contrat : la signature de getFeedPage est bien lue',
     accepted.length > 3, accepted);
 
-  const oubliees = accepted.filter((name) => !transmitted.has(name));
+  // Those the worker fills in itself are not forwarded, and must not be: a tab
+  // naming the channels it considers followed would walk straight through the
+  // one guarantee the product sells.
+  const interne = new Set(FEED_PAGE_INTERNAL_OPTIONS);
+  const oubliees = accepted.filter((name) => !transmitted.has(name) && !interne.has(name));
   check('contrat : aucune option acceptée n’est oubliée à la transmission',
     oubliees.length === 0, oubliees);
+
+  const fuitees = FEED_PAGE_OPTIONS.filter((name) => interne.has(name));
+  check('contrat : aucune option interne n’est transmissible depuis la page',
+    fuitees.length === 0, fuitees);
+
+  const inconnues = FEED_PAGE_INTERNAL_OPTIONS.filter((name) => !accepted.includes(name));
+  check('contrat : les options internes existent bien dans la requête',
+    inconnues.length === 0, inconnues);
 
   const inventees = FEED_PAGE_OPTIONS.filter((name) => !accepted.includes(name));
   check('contrat : aucune option transmise n’est inconnue de la requête',

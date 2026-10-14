@@ -1,7 +1,7 @@
 import { fetchVideoFacts, fetchUploadsDirect } from './innertube-direct.js';
 import {
-  getFeedPage, getVideosByIds, knownShortIds, recordVideoClassification,
-  metaGet, metaSet,
+  getFeedPage, getActiveChannelIds, getVideosByIds, knownShortIds,
+  recordVideoClassification, metaGet, metaSet,
 } from '../lib/db.js';
 import { MSG, broadcast } from '../lib/messages.js';
 import { pool } from '../lib/util.js';
@@ -97,6 +97,11 @@ export async function screenFeedVideos(ids) {
 // Shorts screening does not get to weaken the caller's completeness rule. The
 // main feed requires duration metadata; secondary views may deliberately
 // ask for incomplete rows so the user can still find what they hid or starred.
-export function getScreenedFeedPage(options) {
-  return getFeedPage(options);
+export async function getScreenedFeedPage(options) {
+  // Whose videos these are is settled here rather than trusted from the row.
+  // A video outlives the subscription that brought it in: a channel left
+  // since, or one woken by a repair, keeps filling the grid until something
+  // prunes it, and "something prunes it" has already failed once. One key
+  // read against the `by_active` index answers it for the whole page.
+  return getFeedPage({ ...options, activeChannelIds: await getActiveChannelIds() });
 }

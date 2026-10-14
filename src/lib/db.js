@@ -18,7 +18,7 @@ import { normalize, broadcastKind, videoIncomplete, DAY } from './util.js';
 import { hasCurrentVideoVerdict } from './short-policy.js';
 
 export const DB_NAME = 'ytfeed';
-export const DB_VERSION = 7;
+export const DB_VERSION = 8;
 
 const STORE_CHANNELS = 'channels';
 const STORE_VIDEOS = 'videos';
@@ -54,6 +54,54 @@ let dbPromise = null;
 function indexBroadcasts(videos) {
   if (!videos.indexNames.contains('by_live')) videos.createIndex('by_live', 'isLive');
   if (!videos.indexNames.contains('by_upcoming')) videos.createIndex('by_upcoming', 'isUpcoming');
+}
+
+/**
+ * The bin, in the order things were put into it.
+ *
+ * `by_visible` orders both sides by publication date, which is right for the
+ * feed and wrong for the bin: what someone looks for after hiding a run of
+ * videos is the run they just hid, not whatever happens to be the most
+ * recently published among everything they have ever hidden. Same shape as
+ * `by_visible`, the second element being the moment of hiding.
+ *
+ * Created here and not only in the store creation block, which runs on a brand
+ * new database alone: an index added there would never exist on installed
+ * profiles, that is to say exactly the ones with a full bin.
+ */
+function indexHiddenOrder(videos) {
+  if (!videos.indexNames.contains('by_hidden_at')) {
+    videos.createIndex('by_hidden_at', ['hidden', 'hiddenAt']);
+  }
+}
+
+/**
+ * Gives every hidden row a numeric `hiddenAt` before the index above is built.
+ *
+ * A composite key one half of which is `undefined` is not a valid key, and
+ * IndexedDB does not complain about one: it leaves the record out of the
+ * index. A single row written before this field existed, or restored from a
+ * backup that did not carry it, would therefore disappear from the bin
+ * entirely — a worse defect than the ordering this is here to fix. Every
+ * writer in this file does set it, so the pass is expected to find nothing;
+ * it costs one sweep, once, and removes the need to be sure of that.
+ *
+ * `discoveredAt` stands in where there is nothing better. It is not when the
+ * video was hidden, but it orders those rows plausibly among themselves
+ * instead of piling them all at the bottom on zero.
+ */
+function backfillHiddenAt(videos) {
+  const req = videos.openCursor();
+  req.onsuccess = () => {
+    const cursor = req.result;
+    if (!cursor) return;
+    const video = cursor.value;
+    if (typeof video.hiddenAt !== 'number') {
+      video.hiddenAt = video.hidden ? (video.discoveredAt || video.publishedAt || 0) : 0;
+      cursor.update(video);
+    }
+    cursor.continue();
+  };
 }
 
 /** Opens (or reopens) the database. The MV3 service worker can be killed at any
@@ -96,8 +144,12 @@ export function openDb() {
         // The index the whole feed rendering rests on.
         videos.createIndex('by_visible', ['hidden', 'publishedAt']);
         indexBroadcasts(videos);
+        indexHiddenOrder(videos);
       } else {
-        indexBroadcasts(req.transaction.objectStore(STORE_VIDEOS));
+        const videos = req.transaction.objectStore(STORE_VIDEOS);
+        indexBroadcasts(videos);
+        backfillHiddenAt(videos);
+        indexHiddenOrder(videos);
       }
 
       if (!db.objectStoreNames.contains(STORE_META)) {
@@ -287,6 +339,20 @@ export async function getAllChannels() {
     reqToPromise(tx.objectStore(STORE_CHANNELS).getAll()));
 }
 
+/**
+ * The followed channels, as a set of ids, read through the `by_active` index.
+ *
+ * Only the keys: the feed needs to answer "is this one of mine?" and nothing
+ * else, and reading nine hundred full channel records on every page of the
+ * grid to answer it would be absurd.
+ */
+export async function getActiveChannelIds() {
+  return withTx(STORE_CHANNELS, 'readonly', async (tx) => {
+    const index = tx.objectStore(STORE_CHANNELS).index('by_active');
+    return new Set(await reqToPromise(index.getAllKeys(IDBKeyRange.only(1))));
+  });
+}
+
 export async function putChannel(channel) {
   return withTx(STORE_CHANNELS, 'readwrite', (tx) =>
     reqToPromise(tx.objectStore(STORE_CHANNELS).put(channel)));
@@ -369,20 +435,32 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
     // refuses it outright, so its publications simply stopped arriving, with
     // nothing on screen to say so.
     //
-    // Nobody unsubscribes from four fifths of their list in one day. A pass
-    // that would is therefore not a list of departures, it is a bad read, and
-    // it is refused whole: the condition is on the share of the active list,
-    // not on an absolute count, so it holds for twenty subscriptions as for
-    // nine hundred. A floor is needed under it because a small list makes any
-    // share look alarming — leaving three channels out of five is an ordinary
-    // afternoon's pruning.
+    // Nobody unsubscribes from four fifths of their list in one day, so a pass
+    // that would is not a list of departures, it is a bad read. The share of
+    // the active list is what says so, not an absolute count, and a floor sits
+    // under it because a small list makes any share look alarming — leaving
+    // three channels out of five is an afternoon's pruning.
     //
-    // Refusing costs one feed read per sweep for a channel that really was
-    // unsubscribed, until a sane list turns up. The opposite mistake costs the
-    // videos, which is the one failure this extension cannot afford.
+    // **The guard applies to the unattended reconciliation only.** It was put
+    // on both paths first and that was wrong, in a way that took a day to show
+    // and is worth not repeating: the repair that woke a profile's channels
+    // back up left 930 active against a real list of about 500, so the next
+    // reconciliation wanted to switch off 46 % of them, the guard refused, and
+    // the channels the reader had genuinely left went on filling the feed with
+    // nothing able to prune them. A guard that blocks the cleanup of a repair
+    // is a deadlock, not a safety net.
+    //
+    // An import is somebody pressing a button and watching the result, and it
+    // carries `confirmAbsent: false` precisely because it is meant to take
+    // effect at once. The daily reconciliation is the one that runs unwatched
+    // on whatever YouTube happened to return, it is the path that emptied a
+    // real profile, and it already waits for two observations an hour apart
+    // before switching anything off. The share guard belongs there and only
+    // there.
     const activeCount = existing.filter((c) => c.active).length;
     const wouldDeactivate = existing.filter((c) => c.active && !seen.has(c.id)).length;
     const massWipe = complete
+      && confirmAbsent
       && activeCount >= MIN_ACTIVE_FOR_WIPE_GUARD
       && wouldDeactivate > activeCount * MAX_DEACTIVATION_SHARE;
 
@@ -802,7 +880,7 @@ export async function getFeedPage({
   hideWatched = false, minDurationSec = 0, maxAgeDays = 0, onlyInProgress = false,
   inProgressMinSec = IN_PROGRESS_MIN_SECONDS,
   hideLives = false, hideReplays = false, hideUpcoming = false,
-  requireComplete = false,
+  requireComplete = false, activeChannelIds = null,
 } = {}) {
   // Searching sweeps the cursor rather than using a dedicated index: IndexedDB
   // offers no full-text index, and at a few tens of thousands of records a
@@ -816,6 +894,13 @@ export async function getFeedPage({
 
   const matches = (v) => {
     if (channelId && v.channelId !== channelId) return false;
+    // The last word on whose videos these are. Collection already refuses a
+    // channel that is not followed, but a row can outlive the subscription
+    // that justified it — a channel left since, or woken by a repair — and
+    // until something prunes it, it goes on filling the grid. Asking the
+    // question at paint time is cheap and does not depend on any of that
+    // having gone right.
+    if (activeChannelIds && !activeChannelIds.has(v.channelId)) return false;
     if (onlyUnseen && v.seenNativeAt) return false;
     if (onlyStarred && !v.starred) return false;
     if (onlyInProgress && !isInProgress(v, inProgressMinSec)) return false;
@@ -872,7 +957,11 @@ export async function getFeedPage({
       // The cursor moves on even over discarded records: its real position must
       // therefore be remembered, otherwise the next page would walk them again
       // forever without ever making progress.
-      lastVisited = { publishedAt: cursor.value.publishedAt, id: cursor.value.id };
+      // Carries whichever key the active cursor is ordered on, not always the
+      // publication date: the bin walks on the moment of hiding, and a cursor
+      // remembering the wrong field would page over the same rows for ever.
+      // The name stays, because the caller only hands it back untouched.
+      lastVisited = { publishedAt: ts, id: cursor.value.id };
 
       if (!matches(cursor.value)) return true;
 
@@ -895,14 +984,24 @@ export async function getFeedPage({
       const index = store.index('by_published');
       const range = IDBKeyRange.bound(since, upper);
       await iterate(index.openCursor(range, 'prev'), (c) => push(c, c.key));
+    } else if (onlyHidden) {
+      // The bin is ordered by when a video was put in it, never by when it was
+      // published. Someone who has just hidden a run of videos is looking for
+      // that run; sorting on the publication date buried it under whatever was
+      // most recently published among everything they had ever hidden, which
+      // on a long-lived bin means it never appeared at the top at all.
+      //
+      // `since` is not applied: it bounds a publication window, and the bin is
+      // not one. The grid does not send it for this view either.
+      const index = store.index('by_hidden_at');
+      const range = IDBKeyRange.bound([1, 0], [1, after ? after.publishedAt : MAX_TS]);
+      await iterate(index.openCursor(range, 'prev'), (c) => push(c, c.key[1]));
     } else {
-      // The same composite index serves both views: the first element of the key
-      // selects the visible or the hidden side, the second keeps the reverse
-      // chronological order. Consulting the bin therefore costs exactly as
-      // little as consulting the feed.
-      const side = onlyHidden ? 1 : 0;
+      // The composite index carries the feed: the first element of the key
+      // selects the visible side, the second keeps the reverse chronological
+      // order, and a hidden video is never even visited.
       const index = store.index('by_visible');
-      const range = IDBKeyRange.bound([side, since], [side, upper]);
+      const range = IDBKeyRange.bound([0, since], [0, upper]);
       await iterate(index.openCursor(range, 'prev'), (c) => push(c, c.key[1]));
     }
 

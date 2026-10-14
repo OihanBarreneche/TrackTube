@@ -21,6 +21,22 @@ export const FEED_PAGE_OPTIONS = [
 ];
 
 /**
+ * Options the query accepts but the page may never send.
+ *
+ * `activeChannelIds` is the set of followed channels, and it is the answer to
+ * "is this one of mine?" that decides whether a row is painted at all. It is
+ * read from the database by the worker on each page, deliberately: forwarding
+ * it would mean a tab could name the channels it considers followed, and the
+ * one guarantee this extension sells is that nothing else gets in.
+ *
+ * Named here rather than simply left out, so the contract test keeps meaning
+ * what it says — the test that caught `onlyHidden` being dropped also catches
+ * an option quietly added to the query and never forwarded, and it can only go
+ * on doing that if the exceptions are written down.
+ */
+export const FEED_PAGE_INTERNAL_OPTIONS = ['activeChannelIds'];
+
+/**
  * Copies only the listed keys, skipping the ones that are absent — so the
  * defaults get to apply instead of being overridden with `undefined`.
  *

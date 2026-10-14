@@ -19,7 +19,7 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.3.0, audited in October 2026 for a first public release: the README is
+Version 1.3.1, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are down to `storage`,
 `unlimitedStorage`, `alarms` and `https://www.youtube.com/*`, and the welcome
 flow is three steps rather than six.
@@ -493,7 +493,7 @@ because a measurement can exceed a length that is only a channel average.
 
 ## The data
 
-Database `ytfeed`, version 6. Seven stores, including `videoClassifications` for
+Database `ytfeed`, version 8. Seven stores, including `videoClassifications` for
 player verdicts and durable Short exclusions.
 
 **The name kept its old spelling, and so did every persisted key.** The product
@@ -549,6 +549,28 @@ hidden video is never read, never deserialised, never rendered. That is what
 makes the cost of hiding constant, and it is the central defect of the competing
 extensions that is corrected here. Do not replace it with a JavaScript filter
 after reading.
+
+**The bin has its own index, `by_hidden_at`, and it is not that one.**
+`[hidden, hiddenAt]`, walked backwards, because someone opening the Hidden view
+after putting a run of videos there is looking for that run. Ordered by
+publication date it sat under whatever happened to be most recently published
+among everything they had ever hidden, which on an old bin means it never
+reached the top at all. The page cursor therefore carries whichever key the
+active index is ordered on, not always `publishedAt`; the field keeps that name
+because the caller only hands it back untouched. A composite key half of which
+is `undefined` is not a valid key and IndexedDB silently leaves the record out
+of the index, so the migration gives every row a numeric `hiddenAt` before
+building it — a row missing from the bin would be worse than a row in the wrong
+order.
+
+**Whose videos these are is settled at paint time, by `activeChannelIds`.**
+Collection already refuses a channel that is not followed, but a row outlives
+the subscription that brought it in — a channel left since, one woken by a
+repair — and until something prunes it, it fills the grid. `getScreenedFeedPage`
+reads the followed ids from `by_active` and `getFeedPage` drops anything else.
+That option is in `FEED_PAGE_INTERNAL_OPTIONS` and never in `FEED_PAGE_OPTIONS`:
+a tab allowed to name the channels it considers followed would walk straight
+through the one guarantee the product sells.
 
 **The history has three sources, and `source` says which.** `live` is what the
 extension measured, `takeout` what an export supplied, `yt` what was read off
