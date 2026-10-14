@@ -218,6 +218,10 @@ export const MSG = /** @type {const} */ ({
   AUTH_SWEEP_CHANNEL: 'sync:authenticated-channel',
   AUTH_SWEEP_PROGRESS: 'sync:authenticated-progress',
   AUTH_SWEEP_DONE: 'sync:authenticated-done',
+  // The next few channels whose deep read is the most overdue. This is what
+  // lets the window sweep happen a slice at a time while a YouTube tab is
+  // open, instead of only when somebody presses the refresh button and waits.
+  AUTH_SWEEP_SLICE: 'sync:authenticated-slice',
   AUTO_SYNC_NUDGE: 'sync:auto-nudge',
 });
 

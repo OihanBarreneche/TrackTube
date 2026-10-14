@@ -541,6 +541,64 @@ async function runImport() {
   importRunning = false;
 }
 
+/**
+ * The window sweep, a slice at a time, while a YouTube tab is open.
+ *
+ * The refresh button read every channel on every press: measured on 14 October
+ * 2026 over a 930 channel list, about 3100 requests and 362 MB, some two
+ * minutes of network even at sixteen in flight, and most of it spent
+ * confirming that channels which published nothing still have. Nobody should
+ * have to sit in front of that, and nobody should have to press anything for
+ * their subscriptions to arrive.
+ *
+ * So the same work runs in the background, in slices the size of a breath, and
+ * the cards appear as they are found. The worker hands out the channels whose
+ * deep read is the most overdue, so the whole list rotates on its own: eight
+ * channels every two minutes covers nine hundred in about four hours of
+ * browsing, for roughly 3 MB a slice.
+ *
+ * It yields to the button. A manual sweep is somebody waiting, and the two
+ * reading the same channels at once would only slow that down.
+ */
+const SLICE_CHANNELS = 8;
+const SLICE_INTERVAL_MS = 2 * 60 * 1000;
+const SLICE_FIRST_DELAY_MS = 20 * 1000;
+let sliceTimer = null;
+
+async function sweepOneSlice() {
+  if (authenticatedSweepRunning) return;
+  if (document.visibilityState === 'hidden') return;
+  authenticatedSweepRunning = true;
+  try {
+    const res = await send(MSG.AUTH_SWEEP_SLICE, {
+      limit: SLICE_CHANNELS, key: activeAccountKey(),
+    });
+    const channels = res?.ok ? res.channels ?? [] : [];
+    if (channels.length) await runAuthenticatedSweep(channels, null);
+  } catch (err) {
+    // A slice is not an action anybody asked for, so a failure is not an
+    // event: the next one comes round in two minutes and the channels it
+    // could not read are still the most overdue.
+    log.debug('Background slice skipped', err);
+  } finally {
+    authenticatedSweepRunning = false;
+  }
+}
+
+function startBackgroundSweep() {
+  if (sliceTimer) return () => {};
+  // Nothing in the first seconds of a page load: that is when the grid is
+  // painting and when the user is actually looking at it.
+  const begin = setTimeout(() => {
+    sweepOneSlice();
+    sliceTimer = setInterval(sweepOneSlice, SLICE_INTERVAL_MS);
+  }, SLICE_FIRST_DELAY_MS);
+  return () => {
+    clearTimeout(begin);
+    if (sliceTimer) { clearInterval(sliceTimer); sliceTimer = null; }
+  };
+}
+
 // The popup speaks directly to the open tab rather than dropping a flag and
 // opening a page: it is instant, and nothing moves on screen.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -1208,7 +1266,9 @@ function onNavigate(path) {
     // durations and playback progress, and to measure what YouTube actually
     // shows.
     setTimeout(harvestNativeFeed, 1500);
-    teardown = watchScroll();
+    const stopScroll = watchScroll();
+    const stopSweep = startBackgroundSweep();
+    teardown = () => { stopScroll(); stopSweep(); };
   } else if (path.startsWith('/feed/channels')) {
     // No delay: triage depends only on our database, and letting the
     // subscription list show for a second before covering it gave the

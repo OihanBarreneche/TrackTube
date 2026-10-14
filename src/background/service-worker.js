@@ -2238,6 +2238,43 @@ route({
     }
     return { ...result, avatarsFilled };
   },
+  /**
+   * The next channels whose window read is the most overdue.
+   *
+   * The refresh button read all 930 channels on every click. Measured on 14
+   * October 2026 that is about 3100 requests and 362 MB, some two minutes of
+   * network even at sixteen in flight, and the greater part of it spent
+   * confirming that channels which published nothing still have published
+   * nothing. The same work done a slice at a time, while a YouTube tab is
+   * open, costs nothing anybody waits for and keeps the whole list covered.
+   *
+   * The order is the one fact that decides it: least recently deep read first,
+   * a channel never deep read before all of them. No popularity, no publishing
+   * frequency, nothing an observation cannot settle — the same rule the
+   * scheduler was rewritten around.
+   */
+  [MSG.AUTH_SWEEP_SLICE]: async ({ limit = 8, key = null }) => {
+    if (!await rightAccount(key)) return { channels: [], otherAccount: true };
+    const size = Math.min(40, Math.max(1, Number(limit) || 8));
+    const [channels, recentIds, settings] = await Promise.all([
+      getAllChannels(),
+      getRecentVideoIdsByChannel(1200, { completeOnly: true }),
+      chrome.storage.local.get('ytfeed:settings'),
+    ]);
+    const active = channels.filter((channel) => channel.active);
+    const overdue = active
+      .map((channel) => ({ channel, at: channel.directCoverage?.checkedAt ?? 0 }))
+      .sort((a, b) => a.at - b.at)
+      .slice(0, size);
+    return {
+      remaining: Math.max(0, active.length - overdue.length),
+      channels: overdue.map(({ channel }) => ({
+        id: channel.id,
+        knownIds: recentIds.get(channel.id) ?? [],
+        includeLives: settings?.['ytfeed:settings']?.syncLives !== false,
+      })),
+    };
+  },
   [MSG.AUTH_SWEEP_PROGRESS]: async ({ progressId, done, total, key }) => {
     if (!await rightAccount(key)) return { otherAccount: true };
     const safeDone = Math.max(0, Number(done) || 0);

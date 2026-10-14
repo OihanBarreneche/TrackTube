@@ -19,7 +19,7 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.2.1, audited in October 2026 for a first public release: the README is
+Version 1.3.0, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are down to `storage`,
 `unlimitedStorage`, `alarms` and `https://www.youtube.com/*`, and the welcome
 flow is three steps rather than six.
@@ -111,6 +111,38 @@ complete window. Scope the selected channel tab before parsing: Home can be
 returned when Live is absent, and its recommendations must not be collected.
 The grid rereads above its scroll cursor so late discoveries remain visible.
 Tests cover both collection and display using isolated mocked sources.
+
+**Since 1.3.0 the window sweep also runs by itself, a slice at a time, and the
+button is no longer the only way it happens.** What it costs was measured on 14
+October 2026 against YouTube, over 24 real channels and both of their tabs: a
+page of a channel tab weighs **112 KB on the wire and 1.3 MB decompressed**, the
+window takes **1.7 pages per tab**, and a 930 channel list therefore comes to
+about **3100 requests and 362 MB**. At eight in flight that is 128 s of network
+alone, and a real profile took close to five minutes end to end. Most of it was
+spent confirming that channels which had published nothing still had published
+nothing.
+
+Two things follow. The concurrency is **sixteen**, not eight: the same 48
+requests take 2.4 s at eight and 1.2 s at sixteen, all 200, no 429, with the
+median request unchanged at 330 ms, so this is latency bound and the factor is
+real. And the player verifications inside a channel go out together rather than
+one after another, which they always could — they are independent and none
+reads another's answer.
+
+The slice rotation lives in the tab, on `/feed/subscriptions`, and asks the
+worker through `AUTH_SWEEP_SLICE` for the channels whose deep read is the most
+overdue, a channel never deep read coming before all of them. Eight channels
+every two minutes covers nine hundred in about four hours of browsing for some
+3 MB a slice. The order is the only thing deciding it, and it is an observation
+(`directCoverage.checkedAt`), never popularity or publishing frequency. It
+yields to a manual sweep, because that is somebody waiting.
+
+**Atom cannot be used to decide which channels deserve the deep read.** It is
+35 times cheaper — 6 MB against 362 for the whole list, measured the same day —
+and the idea is tempting every time. It is served with fifteen minutes of CDN
+cache, so a channel whose cached copy predates a publication answers that there
+is nothing new. Gating on it would cost the one thing the deep read is for:
+seeing a video published two minutes ago.
 
 Automatic collection still uses shallow Atom feeds. Do not describe it as an
 exhaustive traversal or assume that a manual scan has made unattended coverage
