@@ -19,7 +19,7 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.4.0, audited in October 2026 for a first public release: the README is
+Version 1.4.1, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are down to `storage`,
 `unlimitedStorage`, `alarms` and `https://www.youtube.com/*`, and the welcome
 flow is three steps rather than six.

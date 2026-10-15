@@ -1,4 +1,4 @@
-# Known limits — 1.4.0
+# Known limits — 1.4.1
 
 Updated October 15, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos

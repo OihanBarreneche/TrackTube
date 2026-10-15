@@ -831,11 +831,29 @@ function delta(id, current, before) {
  * will — so the interface must separate them, not sum them up in one vague
  * warning.
  */
+/**
+ * Joins clauses the way a sentence does: commas, then "and" before the last.
+ *
+ * The separator comes from the catalogue because the two languages do not put
+ * the same word there, and because a comma followed by nothing is what an
+ * enumeration built by concatenation looks like when one of its parts is
+ * dropped.
+ */
+function listSentence(parts) {
+  if (parts.length <= 1) return parts[0] ?? '';
+  return `${parts.slice(0, -1).join(', ')} ${t('hist.rel.src.and')} ${parts[parts.length - 1]}`;
+}
+
 function reliability(s) {
   const el = $('reliability');
   el.replaceChildren();
 
-  if (!s.total) { el.textContent = t('hist.rel.empty'); return; }
+  // An empty range does say something, and says it here: the disclosure stays.
+  if (!s.total) {
+    $('reliability-details').hidden = false;
+    el.textContent = t('hist.rel.empty');
+    return;
+  }
 
   const line = (title, text) => {
     const p = document.createElement('p');
@@ -846,31 +864,56 @@ function reliability(s) {
   };
 
   // 1. The video's duration. Recoverable, and being recovered.
+  //
+  // Silent when every duration is real. The sentence is built to explain what
+  // the estimated ones rest on, and with none of them it read "100 %, and the
+  // 0 others inherit their channel's average duration" — a caveat about
+  // nothing, in a block whose whole job is to qualify. A zero in a warning
+  // teaches the reader that the warning is decoration.
   const known = s.withExactDuration + s.withEstimate;
-  el.append(line(t('hist.rel.dur.b'),
-    s.totalSeconds
-      ? t('hist.rel.dur.p', {
-        total: formatNumber(s.countedVideos),
-        exact: formatNumber(s.withExactDuration),
-        // The share of the total resting on a real length rather than on a
-        // channel average. It sits inside this sentence rather than under the
-        // figure it qualifies: as a third line in the hours card it made that
-        // card taller than the four beside it, and left a hole in the row.
-        pct: percent(s.countedVideos ? s.withExactDuration / s.countedVideos : 0),
-        estimated: formatNumber(s.withEstimate),
-        unknown: formatNumber(s.countedVideos - known),
-      })
-      : t('hist.rel.dur.none')));
+  const approximated = s.countedVideos - s.withExactDuration;
+  if (!s.totalSeconds) {
+    el.append(line(t('hist.rel.dur.b'), t('hist.rel.dur.none')));
+  } else if (approximated > 0) {
+    // Built from clauses rather than one sentence with four holes in it, for
+    // the reason above: with every duration fetched but a handful, it printed
+    // "and 0 are left out for lack of data" — a figure whose only job is to
+    // reassure, written as a warning.
+    const unknown = s.countedVideos - known;
+    let sentence = t('hist.rel.dur.p', {
+      total: formatNumber(s.countedVideos),
+      exact: formatNumber(s.withExactDuration),
+      // The share of the total resting on a real length rather than on a
+      // channel average. It sits inside this sentence rather than under the
+      // figure it qualifies: as a third line in the hours card it made that
+      // card taller than the four beside it, and left a hole in the row.
+      pct: percent(s.countedVideos ? s.withExactDuration / s.countedVideos : 0),
+    });
+    if (s.withEstimate > 0) {
+      sentence += t('hist.rel.dur.avg', { estimated: formatNumber(s.withEstimate) });
+    }
+    if (unknown > 0) {
+      sentence += t('hist.rel.dur.unknown', { unknown: formatNumber(unknown) });
+    }
+    el.append(line(t('hist.rel.dur.b'), sentence));
+  }
 
   // 2. Which of the two measures of time carries the range. Two sentences: the
   //    figure's badge already says the essential, this gives the reason.
+  //
+  //    The mixed model is silent when nothing was completed: with no unseen
+  //    video it announced that "the 0 videos the extension did not see complete
+  //    the total for 0 s", which is the same defect as above. The whole range
+  //    then rests on a measurement, and that is what the badge already says.
   if (s.timeMode === 'mixed') {
-    el.append(line(t('hist.rel.mixed.b'), t('hist.rel.mixed.p', {
-      measured: formatDuration(Math.round(s.watchedSeconds)),
-      n: formatNumber(s.measuredOpens),
-      estimated: formatDuration(Math.round(s.extraSeconds)),
-      m: formatNumber(s.extraVideos),
-    })));
+    if (s.extraVideos > 0) {
+      el.append(line(t('hist.rel.mixed.b'), t('hist.rel.mixed.p', {
+        measured: formatDuration(Math.round(s.watchedSeconds)),
+        n: formatNumber(s.measuredOpens),
+        estimated: formatDuration(Math.round(s.extraSeconds)),
+        m: formatNumber(s.extraVideos),
+      })));
+    }
   } else {
     el.append(s.timeMode === 'real'
       ? line(t('hist.rel.real.b'), t('hist.rel.real.p', {
@@ -887,13 +930,21 @@ function reliability(s) {
   //        another browser, or this one before it was installed. A scraped line
   //        carries a day and no hour, so nothing can ever be measured on it —
   //        collecting them lowers the measured share for good.
+  //        Only the sources that actually brought something are named. The
+  //        sentence used to list all three whatever their count, so a range
+  //        imported wholesale from a Takeout file read "0 were measured by the
+  //        extension, 900 come from a Takeout export and 0 from YouTube's own
+  //        history page" — two thirds of it about nothing.
   const untraced = (s.bySource?.takeout ?? 0) + (s.bySource?.yt ?? 0);
   if (untraced > 0) {
+    const parts = [
+      ['hist.rel.src.live', s.bySource.live ?? 0],
+      ['hist.rel.src.takeout', s.bySource.takeout ?? 0],
+      ['hist.rel.src.yt', s.bySource.yt ?? 0],
+    ].filter(([, n]) => n > 0).map(([key, n]) => t(key, { n: formatNumber(n) }));
     el.append(line(t('hist.rel.sources.b'), t('hist.rel.sources.p', {
-      live: formatNumber(s.bySource.live),
-      takeout: formatNumber(s.bySource.takeout),
-      yt: formatNumber(s.bySource.yt),
       total: formatNumber(s.total),
+      parts: listSentence(parts),
     })));
   }
 
@@ -908,6 +959,11 @@ function reliability(s) {
   if (s.unresolved) {
     el.append(line(t('hist.rel.gone.b'), t('hist.rel.gone.p', { n: formatNumber(s.unresolved) })));
   }
+
+  // Nothing approximate left to report, so the disclosure itself goes. Every
+  // line above is now conditional, and a caution whose contents are empty is
+  // an invitation to open it and find out that it had nothing to say.
+  $('reliability-details').hidden = el.childElementCount === 0;
 }
 
 /**
