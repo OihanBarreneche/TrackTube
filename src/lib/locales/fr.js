@@ -349,7 +349,7 @@ export const fr = {
   'set.subs': 'Abonnements',
   'set.subs.reimport': 'Réimporter depuis YouTube',
   'set.subs.takeout': 'Importer un fichier Takeout',
-  'set.subs.hint': 'Détectés au vol. À utiliser après un abonnement pris ailleurs.',
+  'set.subs.hint': 'Repris tout seuls en un jour ou deux. Ce bouton le fait tout de suite, par exemple si une chaîne que tu as quittée apparaît encore.',
   'set.subs.lot': 'Appliquer une liste à mon compte',
   'set.subs.lot.hint': 'S’abonne et se désabonne pour de vrai, après validation.',
   'set.backup': 'Sauvegarde',

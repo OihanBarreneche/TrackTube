@@ -368,18 +368,25 @@ export async function putChannel(channel) {
  * @param {Array<{id: string, title?: string, avatarUrl?: string}>} imported
  */
 /**
- * Share of the active list a single reconciliation may switch off, and the size
- * below which that share says nothing. See the reasoning inside
+ * How small a complete list may be, against the last one believed, before it is
+ * read as a truncated read rather than a batch of departures; and the number of
+ * channels below which that ratio says nothing. See the reasoning inside
  * `reconcileChannels`.
  */
-const MAX_DEACTIVATION_SHARE = 0.25;
-const MIN_ACTIVE_FOR_WIPE_GUARD = 20;
+const MIN_LIST_SHARE = 0.75;
+const MIN_LIST_FOR_WIPE_GUARD = 20;
+/** Meta keys holding the last believed list size, and the last refused one. */
+const META_LIST_BASELINE = 'subs.listBaseline';
+const META_LIST_DOUBT = 'subs.listDoubt';
+/** A doubt is only confirmed by a second read at least this much later. */
+const LIST_DOUBT_DELAY_MS = 60 * 60 * 1000;
 
 export async function reconcileChannels(imported, { complete = false, confirmAbsent = false } = {}) {
   const now = Date.now();
   const seen = new Set(imported.map((c) => c.id));
 
-  return withTx(STORE_CHANNELS, 'readwrite', async (tx) => {
+  return withTx([STORE_CHANNELS, STORE_META], 'readwrite', async (tx) => {
+    const meta = tx.objectStore(STORE_META);
     const store = tx.objectStore(STORE_CHANNELS);
     const existing = await reqToPromise(store.getAll());
     const byId = new Map(existing.map((c) => [c.id, c]));
@@ -456,14 +463,59 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
     // effect at once. The daily reconciliation is the one that runs unwatched
     // on whatever YouTube happened to return, it is the path that emptied a
     // real profile, and it already waits for two observations an hour apart
-    // before switching anything off. The share guard belongs there and only
-    // there.
+    // before switching anything off. The guard belongs there and only there.
+    //
+    // **And it is measured against the last list YouTube gave, not against our
+    // own active count.** Exempting the manual import was not enough, and the
+    // reason is that the share of the active list is the wrong quantity: our
+    // active count is whatever an earlier bad read or a repair happened to
+    // leave it at. On the profile above it stood at 930 against a real list of
+    // 592, so the daily pass wanted to switch off 36 % of it, every day,
+    // forever — above the quarter the guard allowed, refused every time, and
+    // `UCLS4wuBNQTIr4RAAG_stxOQ` went on painting 42 minute videos into a feed
+    // of channels the reader does not follow. The deadlock was not fixed by
+    // exempting one path; it was still there on the only path that runs by
+    // itself, which is to say for anybody who does not think to re-import.
+    //
+    // What actually goes wrong is YouTube returning a short list, and the way
+    // to see that is to compare it with the last list YouTube returned. 592
+    // after 592 is a believable afternoon's pruning however many channels we
+    // hold; 116 after 592 is a bad read. So the baseline is the last list
+    // believed, a complete list smaller than three quarters of it is doubted,
+    // and a refusal is never final: the same size coming back an hour later is
+    // a second observation and it is believed, which is the rule
+    // `confirmAbsent` already applies channel by channel. Without that, a
+    // reader who genuinely unsubscribed from a third of their list in one go
+    // would be refused for good — the same deadlock, one level up.
+    const incoming = seen.size;
+    const baseline = await reqToPromise(meta.get(META_LIST_BASELINE));
+    const doubt = await reqToPromise(meta.get(META_LIST_DOUBT));
+    const baseSize = baseline?.value?.size ?? 0;
+    const doubted = baseSize >= MIN_LIST_FOR_WIPE_GUARD
+      && incoming < baseSize * MIN_LIST_SHARE;
+    // A second read agreeing with the refused one, far enough apart to be a
+    // separate observation rather than a retry of the same failure.
+    const doubtSize = doubt?.value?.size ?? 0;
+    const confirmedTwice = doubtSize > 0
+      && now - (doubt?.value?.at ?? 0) >= LIST_DOUBT_DELAY_MS
+      && Math.abs(incoming - doubtSize) <= Math.max(5, doubtSize * 0.1);
+    const massWipe = complete && confirmAbsent && doubted && !confirmedTwice;
+
     const activeCount = existing.filter((c) => c.active).length;
     const wouldDeactivate = existing.filter((c) => c.active && !seen.has(c.id)).length;
-    const massWipe = complete
-      && confirmAbsent
-      && activeCount >= MIN_ACTIVE_FOR_WIPE_GUARD
-      && wouldDeactivate > activeCount * MAX_DEACTIVATION_SHARE;
+
+    // Only a list that was acted upon becomes the yardstick for the next one,
+    // and a refused one is remembered separately. Writing the baseline from a
+    // refused read would ratchet it down to whatever the broken read returned,
+    // and the guard would then wave through the very list it had just refused.
+    if (complete) {
+      if (massWipe) {
+        await reqToPromise(meta.put({ key: META_LIST_DOUBT, value: { size: incoming, at: now } }));
+      } else {
+        await reqToPromise(meta.put({ key: META_LIST_BASELINE, value: { size: incoming, at: now } }));
+        if (doubtSize) await reqToPromise(meta.delete(META_LIST_DOUBT));
+      }
+    }
 
     const deactivatedIds = [];
     let awaitingConfirmation = 0;
@@ -496,8 +548,12 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
       deactivationSkipped: !complete || massWipe,
       // And the refusal is named, because "nothing was deactivated" and "we
       // refused to deactivate eight hundred channels" are not the same event
-      // and only the second one needs looking at.
-      massWipeRefused: massWipe ? { active: activeCount, wouldDeactivate } : null,
+      // and only the second one needs looking at. The two list sizes go with
+      // it: they are what the decision was taken on, and reading the refusal
+      // without them tells nobody whether the list or the guard was wrong.
+      massWipeRefused: massWipe
+        ? { active: activeCount, wouldDeactivate, list: incoming, baseline: baseSize }
+        : null,
     };
   });
 }

@@ -345,7 +345,7 @@ export const en = {
   'set.subs': 'Subscriptions',
   'set.subs.reimport': 'Import again from YouTube',
   'set.subs.takeout': 'Import a Takeout file',
-  'set.subs.hint': "Detected on the fly. Use after subscribing elsewhere.",
+  'set.subs.hint': "Picked up on their own within a day or two. This button does it now, for instance when a channel you left is still showing.",
   'set.subs.lot': 'Apply a list to my account',
   'set.subs.lot.hint': "This one really subscribes and unsubscribes, after confirmation.",
   'set.backup': 'Backup',

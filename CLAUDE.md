@@ -182,6 +182,41 @@ when a page fails; the daily reconciliation handed that partial list to
 longer swept, no publication arriving, nothing on screen. Deactivation is now
 subject to the same `complete` flag that already guarded the video purge.
 
+**A guard that cannot be satisfied is a bug, and this one took three tries.**
+The `complete` flag was not enough — a pagination that runs to the end does not
+prove YouTube returned everything — so 1.2.1 added a second condition, and both
+later versions of it failed in the same way: they measured the suspect list
+against **our own active count**, which is whatever an earlier bad read or a
+repair happened to leave it at.
+
+`reactivateAllChannels` had woken a profile's 930 rows against a real list of
+592, so every daily pass wanted to switch off 36 % of the active list. At first
+that tripped a quarter-of-the-active-list refusal on both paths, which also
+refused the manual import — a deadlock, fixed by exempting the attended path.
+That fix was mistaken for the whole fix. The automatic path is the only one that
+runs by itself, it was still refused, every day, for ever, and nothing else
+prunes: `UCLS4wuBNQTIr4RAAG_stxOQ` was still painting 42 minute videos into a
+grid of channels the reader does not follow on 16 October 2026, nine days later.
+
+Since 1.4.2 the yardstick is **the last list YouTube returned**, held in
+`meta` under `subs.listBaseline`. 592 after 592 is a believable afternoon's
+pruning however many rows we hold; 116 after 592 is a bad read. A refused read
+is remembered separately, under `subs.listDoubt`, and never becomes the
+baseline — writing it would ratchet the yardstick down to whatever the broken
+read returned, and the guard would then wave through the list it had just
+refused. And the refusal expires: the same size an hour later is a second
+observation and is acted on, which is the rule `confirmAbsent` already applies
+channel by channel. Without that, a reader who genuinely unsubscribed from a
+third of their list would be refused for good — the same deadlock, one level up.
+
+Two consequences worth stating before touching this again. Any guard here must
+be checkable against something YouTube said, never against a count of our own
+that our own bugs write. And a departure takes two reconciliations to leave the
+feed, which at one a day is **two days**, because the paint guard reads
+`active`; the remedy offered to a reader in a hurry is the settings panel's
+« Réimporter depuis YouTube », the attended path, which prunes and purges at
+once.
+
 **The reverse audit only judges channels the extension follows.** It used to
 count every dated card of YouTube's subscriptions page that we did not hold,
 which accuses the collector of missing videos it was never asked to fetch —

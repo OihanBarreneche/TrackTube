@@ -2078,9 +2078,10 @@ route({
     // it left out was switched off. Nothing is deactivated and nothing is
     // purged in that case, so the only trace would otherwise be a zero.
     if (result.massWipeRefused) {
-      log.warn('Subscription list refused: it would have deactivated '
-        + `${result.massWipeRefused.wouldDeactivate} of ${result.massWipeRefused.active} `
-        + `active channels, from a list of ${result.total}`);
+      log.warn(`Subscription list refused: ${result.massWipeRefused.list} channels against `
+        + `a last believed list of ${result.massWipeRefused.baseline}, which would have `
+        + `deactivated ${result.massWipeRefused.wouldDeactivate} of `
+        + `${result.massWipeRefused.active} active channels`);
     }
 
     await applyDefaultCadence(result.total);

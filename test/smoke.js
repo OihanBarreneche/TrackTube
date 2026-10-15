@@ -57,6 +57,7 @@ export async function run() {
   await testHistoriqueRecupere(check);
   await testJournalDuJour(check);
   await testReverseAudit(check);
+  await testListGuard(check);
   testManiereDeRegarder(check);
   testDelaiParChaine(check);
   testArchiveZip(check);
@@ -3376,6 +3377,55 @@ async function testHistoriqueRecupere(check) {
  * things it must never do: hide a difference between sources behind a total, and
  * count a video's length on top of a measurement of that same video.
  */
+/**
+ * The guard that decides whether a shrinking subscription list is a batch of
+ * departures or a truncated read.
+ *
+ * It runs last among the suites touching the database, because establishing a
+ * believable list of thirty deactivates every channel the earlier ones created.
+ *
+ * Its first version compared the drop against our own **active count**, and
+ * that quantity is worth nothing: on a profile whose active count a repair had
+ * left at 930 against a real list of 592, the daily pass wanted to switch off
+ * 36 % of it, every day, and was refused every day. The channels the reader had
+ * genuinely left went on painting videos into the feed with nothing able to
+ * prune them. The baseline is the last list YouTube itself gave.
+ */
+async function testListGuard(check) {
+  const believable = Array.from({ length: 30 }, (_, i) => mkChannel(100 + i));
+  const shrunk = believable.slice(0, 10);
+
+  await db.reconcileChannels(believable, { complete: true });
+  check('garde liste : une liste crue devient la référence',
+    (await db.metaGet('subs.listBaseline'))?.size === 30);
+
+  const refusee = await db.reconcileChannels(shrunk, { complete: true, confirmAbsent: true });
+  check('garde liste : une liste tombée au tiers est refusée sans rien désactiver',
+    refusee.deactivated === 0 && refusee.deactivationSkipped === true
+      && refusee.massWipeRefused?.list === 10 && refusee.massWipeRefused?.baseline === 30,
+    refusee);
+  // A refused read must not become the yardstick, or the guard would wave
+  // through the very list it had just refused.
+  check('garde liste : une lecture refusée ne déplace pas la référence',
+    (await db.metaGet('subs.listBaseline'))?.size === 30);
+
+  // A refusal is not final: the same size an hour later is a second
+  // observation, and the reader who really did unsubscribe from twenty
+  // channels must not be refused for good.
+  await db.metaSet('subs.listDoubt', { size: 10, at: Date.now() - 2 * HOUR });
+  const confirmee = await db.reconcileChannels(shrunk, { complete: true, confirmAbsent: true });
+  check('garde liste : la même liste une heure plus tard est crue',
+    confirmee.massWipeRefused === null && confirmee.awaitingConfirmation === 20
+      && confirmee.deactivated === 0,
+    confirmee);
+
+  // And the manual import is never doubted: somebody is watching the result.
+  await db.reconcileChannels(believable, { complete: true });
+  const manuelle = await db.reconcileChannels(shrunk, { complete: true });
+  check('garde liste : un import manuel désactive tout de suite',
+    manuelle.deactivated === 20 && manuelle.massWipeRefused === null, manuelle);
+}
+
 /**
  * The four figures that say how one watches rather than how much: the delay
  * before opening, the sittings, the rewatches and the drop off point.

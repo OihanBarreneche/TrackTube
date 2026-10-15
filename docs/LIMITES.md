@@ -1,6 +1,6 @@
-# Known limits — 1.4.1
+# Known limits — 1.4.2
 
-Updated October 15, 2026. What follows is what TrackTube does not promise, and
+Updated October 16, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
 they name, and YouTube owes nobody stability on any of them.
 
@@ -31,15 +31,31 @@ itself complete and switched off everything it omitted emptied a real profile:
 measured on 14 October 2026, 930 channels known — every one ever seen, left
 subscriptions included — of which 592 are real subscriptions and only 116 were
 still active. Since
-1.2.1 the unattended daily reconciliation also refuses any pass that would
-switch off more than a quarter of the active list, and a one-time repair wakes
-the channels an earlier bad read had silenced. The guard is on the unattended
-path only: a manual import is somebody watching the result, and it takes effect
-at once, otherwise it could never prune what the repair over-woke.
+1.2.1 the unattended daily reconciliation also refuses a list it does not
+believe, and a one-time repair wakes the channels an earlier bad read had
+silenced. The guard is on the unattended path only: a manual import is somebody
+watching the result, and it takes effect at once, otherwise it could never prune
+what the repair over-woke.
+
+What makes a list unbelievable is its size against **the last list YouTube
+returned**, not against how many channels we hold active. Until 1.4.2 it was
+measured against the active count, and that quantity is worth nothing: the
+repair above left 930 active against a real list of 592, so the daily pass
+wanted to switch off 36 % of them, which was more than the quarter then allowed,
+and it was refused every day for good. Channels genuinely unsubscribed from went
+on filling the feed with nothing able to prune them — `UCLS4wuBNQTIr4RAAG_stxOQ`
+reached a reader's grid that way on 16 October 2026. A complete list smaller than
+three quarters of the last one believed is now doubted, and the refusal is never
+final: the same size coming back an hour later is a second observation and is
+acted on, so a reader who really did leave a third of their subscriptions is not
+refused for ever.
 
 Waking channels back up reactivates ones genuinely unsubscribed from. They are
 switched off again by the next believable list, after the two observations an
-hour apart that confirmation already requires.
+hour apart that confirmation already requires — and because the reconciliation
+runs once a day, that is a day, not an hour. A channel left elsewhere can
+therefore stay in the feed until the day after next. Re-importing the
+subscriptions from the settings panel prunes it at once.
 
 The deep read also runs by itself since 1.3.0, a few channels every couple of
 minutes while the Subscriptions page is open, taking those whose last deep read
