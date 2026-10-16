@@ -73,6 +73,8 @@ export const fr = {
   'feed.empty.feed': 'Rien à voir pour l’instant.',
   'feed.error.load': 'Chargement impossible : {error}',
   'feed.error.mount': 'Montage de la grille impossible',
+  'feed.error.hide': 'Masquage impossible, les vidéos sont remises en place.',
+  'feed.error.restore': 'Remise en place impossible.',
 
   // -- vignette
   'card.channel.only': 'Ne voir que les vidéos de cette chaîne',

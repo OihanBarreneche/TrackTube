@@ -1,4 +1,4 @@
-# Known limits — 1.4.2
+# Known limits — 1.4.3
 
 Updated October 16, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
@@ -103,6 +103,19 @@ for exclusion; ordinary short videos must remain eligible.
 The user requested this previous behaviour on October 7. The later 0.91.3/0.91.4
 verification and approval-cache policies are no longer active. Restoring code
 does not restore an earlier snapshot of browser data or overwritten titles.
+
+## Hiding
+
+A hiding is recorded against the video identifier, not only against the row that
+carries it, so a video whose row is deleted and later recollected comes back
+hidden. Until 1.4.3 it did not: the write found no row and did nothing, and the
+grid had already folded the thumbnail away, so the gesture looked done and the
+video reappeared on the next paint. A refused write now puts the thumbnails back
+and says so, rather than leaving the feed showing something the database never
+agreed to.
+
+Hiding stays local. YouTube is never told, and a hidden video is still in the
+account's own subscriptions feed.
 
 ## Dates, metadata and diagnostics
 

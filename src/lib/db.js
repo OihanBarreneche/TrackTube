@@ -1135,7 +1135,23 @@ async function writeHiddenState(tx, id, hiddenAt) {
   }
 }
 
-/** Flips the hidden state of a batch of videos. */
+/**
+ * Flips the hidden state of a batch of videos.
+ *
+ * **A missing row does not cancel the decision.** It used to: the loop read the
+ * row, found nothing and moved on, so nothing at all was written. The grid can
+ * perfectly well paint a card whose row has since been deleted — a channel
+ * purge removes the videos of every channel a reconciliation switches off, and
+ * the grid holds its thumbnails until the next paint — and collection recreates
+ * that row as soon as the channel comes back. Fifteen videos hidden one evening
+ * came back the next morning that way, which is the one gesture this product
+ * cannot afford to lose. The decision is therefore recorded in the
+ * classification store for every id, present or not, and the insertion path
+ * already reads it back as `userHiddenAt`.
+ *
+ * @returns {Promise<{changed: number, recorded: number, missing: number}>}
+ *   rows updated, decisions written, and how many of those had no row.
+ */
 export async function setHidden(ids, hidden) {
   const now = Date.now();
   const flag = hidden ? 1 : 0;
@@ -1143,10 +1159,13 @@ export async function setHidden(ids, hidden) {
   return withTx([STORE_VIDEOS, STORE_SHORTS], 'readwrite', async (tx) => {
     const store = tx.objectStore(STORE_VIDEOS);
     let changed = 0;
+    let recorded = 0;
+    let missing = 0;
     for (const id of ids) {
       const v = await reqToPromise(store.get(id));
-      if (!v) continue;
-      await writeHiddenState(tx, id, hidden ? v.hiddenAt || now : 0);
+      await writeHiddenState(tx, id, hidden ? (v?.hiddenAt || now) : 0);
+      recorded++;
+      if (!v) { missing++; continue; }
       if (v.hidden === flag) continue;
       v.hidden = flag;
       v.hiddenAt = hidden ? now : 0;
@@ -1158,7 +1177,7 @@ export async function setHidden(ids, hidden) {
       await reqToPromise(store.put(v));
       changed++;
     }
-    return changed;
+    return { changed, recorded, missing };
   });
 }
 

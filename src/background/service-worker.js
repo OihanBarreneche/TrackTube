@@ -1270,9 +1270,21 @@ route({
 
   [MSG.GET_STATS]: async () => ({ stats: await getStats() }),
 
-  [MSG.SET_HIDDEN]: async ({ ids, hidden }) => ({
-    changed: await setHidden(ids ?? [], hidden !== false),
-  }),
+  // `changed` counts the rows actually flipped, `recorded` the decisions
+  // written. They differ on a video already in the state asked for, and on one
+  // whose row a channel purge has deleted — the tab needs `recorded` to know
+  // the gesture took, not `changed`, which is zero in both those cases.
+  [MSG.SET_HIDDEN]: async ({ ids, hidden }) => {
+    const outcome = await setHidden(ids ?? [], hidden !== false);
+    // Said out loud, because it is the only trace of a card outliving its row.
+    // Without it the next report of "my hidden videos came back" is again
+    // undiagnosable from here.
+    if (outcome.missing) {
+      log.warn(`${outcome.missing} of ${ids?.length ?? 0} hidden video(s) had no row; `
+        + 'the decision was recorded against the classification store');
+    }
+    return outcome;
+  },
 
   [MSG.HIDE_CHANNEL]: async ({ channelId, hidden = true }) => ({
     changedIds: await hideChannelVideos(channelId, hidden),

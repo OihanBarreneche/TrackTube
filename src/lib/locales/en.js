@@ -69,6 +69,8 @@ export const en = {
   'feed.empty.feed': 'Nothing to watch right now.',
   'feed.error.load': 'Could not load: {error}',
   'feed.error.mount': 'Could not mount the grid',
+  'feed.error.hide': 'Could not hide those, they are back in place.',
+  'feed.error.restore': 'Could not put those back.',
 
   // -- thumbnail
   'card.channel.only': 'Show only this channel',

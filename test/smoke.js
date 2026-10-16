@@ -1857,6 +1857,40 @@ async function testHiding(check) {
 
   const recent = await db.getVideosSince(BASE_TS - 30 * 60_000);
   check('getVideosSince : filtre bien par date', recent.length === 3, recent.length);
+
+  // The gesture a channel purge used to swallow. The grid holds its thumbnails
+  // until the next paint, so a card can outlive its row; hiding it wrote
+  // nothing at all, and the video came back visible the moment collection
+  // recreated the row. The decision has to survive the row's absence.
+  const ghost = 'fantome001';
+  const outcome = await db.setHidden([ghost], true);
+  check('masquage : une ligne absente enregistre quand même la décision',
+    outcome.recorded === 1 && outcome.missing === 1 && outcome.changed === 0, outcome);
+
+  await db.upsertVideos([{
+    id: ghost, channelId: channelId(1), channelTitle: 'Chaîne 1',
+    title: 'Masquée avant de revenir', publishedAt: BASE_TS,
+    thumbUrl: 'https://example/thumb/ghost', durationSec: 600,
+  }]);
+  const recreated = (await db.getVideosByIds([ghost])).get(ghost);
+  check('masquage : la vidéo recréée revient masquée, pas visible',
+    recreated?.hidden === 1 && recreated.hiddenAt > 0, recreated);
+  const stillOut = await db.getFeedPage({ limit: 50 });
+  check('masquage : et elle ne repasse pas dans le feed',
+    !stillOut.items.some((v) => v.id === ghost), stillOut.items.length);
+
+  // Unhiding it must clear the durable marker too, or the video could never
+  // come back at all once its row was deleted a second time.
+  await db.setHidden([ghost], false);
+  await db.deleteVideos([ghost]);
+  await db.upsertVideos([{
+    id: ghost, channelId: channelId(1), channelTitle: 'Chaîne 1',
+    title: 'Remise en place', publishedAt: BASE_TS,
+    thumbUrl: 'https://example/thumb/ghost', durationSec: 600,
+  }]);
+  check('démasquage : la décision effacée ne ressuscite pas le masquage',
+    (await db.getVideosByIds([ghost])).get(ghost)?.hidden === 0);
+  await db.deleteVideos([ghost]);
 }
 
 /**

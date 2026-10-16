@@ -3852,7 +3852,13 @@ async function toggleStar(id, card) {
 /** Puts a hidden video back into the feed, from the "Hidden" view. */
 async function restoreVideo(id, card) {
   const res = await send(MSG.SET_HIDDEN, { ids: [id], hidden: false });
-  if (!res.ok) { log.error('Restore failed', res.error); return; }
+  // This one asks before it paints, so there is nothing to put back — only
+  // something to say, which a console line is not.
+  if (!res.ok) {
+    log.error('Restore failed', res.error);
+    flash(t('feed.error.restore'));
+    return;
+  }
 
   // In the "Hidden" view, a restored video has nothing left to do there.
   if (state.view === 'hidden') {
@@ -3903,7 +3909,12 @@ async function restoreVideos(ids) {
   updateToolbar();
 
   const res = await send(MSG.SET_HIDDEN, { ids, hidden: false });
-  if (!res.ok) { log.error('Restore failed', res.error); return; }
+  if (!res.ok) {
+    log.error('Restore failed', res.error);
+    unhideCards(ids);
+    flash(t('feed.error.restore'));
+    return;
+  }
 
   flash(t('toast.restored', { n: ids.length }));
   refreshStats();
@@ -3970,7 +3981,17 @@ async function hideVideos(ids) {
   updateToolbar();
 
   const res = await send(MSG.SET_HIDDEN, { ids, hidden: true });
-  if (!res.ok) { log.error('Hiding failed', res.error); return; }
+  // A refused write used to leave the thumbnails folded away and say nothing
+  // but a console line. The gesture reported itself as done, the videos came
+  // back on the next paint, and the only honest reading of that is that hiding
+  // is unreliable. Put them back and say so: an error message is the one
+  // sentence this interface is allowed.
+  if (!res.ok) {
+    log.error('Hiding failed', res.error);
+    unhideCards(ids);
+    flash(t('feed.error.hide'));
+    return;
+  }
 
   showUndoToast(ids);
   refreshStats();
@@ -4014,7 +4035,11 @@ function showUndoToast(ids) {
     toast.remove();
     clearTimeout(toastTimer);
     const res = await send(MSG.SET_HIDDEN, { ids, hidden: false });
-    if (!res.ok) { log.error('Undo failed', res.error); return; }
+    if (!res.ok) {
+      log.error('Undo failed', res.error);
+      flash(t('feed.error.restore'));
+      return;
+    }
     unhideCards(ids);
   });
 

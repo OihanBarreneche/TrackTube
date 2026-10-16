@@ -601,6 +601,30 @@ of the index, so the migration gives every row a numeric `hiddenAt` before
 building it — a row missing from the bin would be worse than a row in the wrong
 order.
 
+**A hiding is recorded even when there is no row to record it on.** `setHidden`
+read the row, found nothing and moved on, writing nothing at all — and the grid
+can perfectly well hand it an id whose row is gone, because it holds its
+thumbnails until the next paint while a channel purge deletes the videos of
+every channel a reconciliation switches off. Collection then recreates that row
+from the feed, and the insert path reads `hidden` from the classification
+store's `userHiddenAt`, which nothing had written. Fifteen videos hidden one
+evening were back the next morning. The decision is now written for every id,
+present or not; `writeHiddenState` was always meant to carry exactly that, and
+every deletion path already called it. `setHidden` returns `{changed, recorded,
+missing}` rather than a count, because "no row was flipped" and "no decision was
+taken" are not the same event and only the second one is a loss.
+
+**And the gesture may not confirm itself before the write has answered.**
+`hideVideos` folded the thumbnails away, then sent the message, then on failure
+wrote one console line and returned — leaving them folded, so the gesture
+reported itself as done and the videos came back on the next paint. That is the
+worst shape a defect can take here: hiding is the feature, and a hiding that
+silently does nothing reads as an unreliable product rather than a failed
+request. The cards go back and an error is shown. The rule that an action
+reports itself visually does not license reporting a success that did not
+happen, and the four `SET_HIDDEN` call sites in `feed-view.js` each need their
+own failure path.
+
 **Whose videos these are is settled at paint time, by `activeChannelIds`.**
 Collection already refuses a channel that is not followed, but a row outlives
 the subscription that brought it in — a channel left since, one woken by a
