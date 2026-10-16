@@ -74,6 +74,17 @@ export const MSG = /** @type {const} */ ({
   GET_CHANNELS: 'subs:list',
   SUBSCRIPTION_SEEN: 'subs:seen',
 
+  /**
+   * "I am not subscribed to this channel any more", said by hand from the grid.
+   *
+   * Everything else that deactivates a channel needs YouTube's subscription
+   * list, which needs a readable session cookie — and on a browser that does
+   * not expose one, the reconciliation returns early and nothing ever prunes.
+   * A reader looking at a video from a channel they left must not depend on
+   * that: this writes the local row and purges its videos, no request at all.
+   */
+  FORGET_CHANNEL: 'subs:forget',
+
   /** Import request addressed to an already open YouTube tab. */
   RUN_IMPORT: 'subs:runImport',
 

@@ -3458,6 +3458,28 @@ async function testListGuard(check) {
   const manuelle = await db.reconcileChannels(shrunk, { complete: true });
   check('garde liste : un import manuel désactive tout de suite',
     manuelle.deactivated === 20 && manuelle.massWipeRefused === null, manuelle);
+
+  // The escape hatch, which needs no list at all. Everything above depends on
+  // YouTube answering with the subscriptions; on a browser whose session the
+  // isolated world cannot read, none of it ever runs, and this is the only
+  // thing that can still take a channel out of the feed.
+  const left = channelId(100);
+  await db.upsertVideos([{
+    id: 'quittee001', channelId: left, channelTitle: 'Chaîne 100',
+    title: 'Vidéo d’une chaîne quittée', publishedAt: BASE_TS,
+    thumbUrl: 'https://example/thumb/left', durationSec: 900,
+  }]);
+  const forgotten = await db.forgetChannel(left);
+  check('oubli : la chaîne est désactivée sur le champ',
+    forgotten.found === true && (await db.getChannel(left)).active === 0, forgotten);
+  check('oubli : elle sort du jeu des chaînes suivies',
+    !(await db.getActiveChannelIds()).has(left));
+  const purged = await db.deleteChannelVideos(left);
+  check('oubli : ses vidéos sont purgées', purged >= 1, purged);
+  check('oubli : une chaîne inconnue ne casse rien',
+    (await db.forgetChannel(channelId(999))).found === false);
+  check('oubli : le compte des suivies le reflète',
+    (await db.getStats()).activeChannels === (await db.getActiveChannelIds()).size);
 }
 
 /**

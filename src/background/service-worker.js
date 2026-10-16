@@ -15,7 +15,7 @@ import {
 import { runAudit, runReverseAudit, recordNativeCoverage, getNativeCoverage } from './audit.js';
 import {
   openDb, getStats, setHidden, setWatched,
-  reconcileChannels, reactivateAllChannels, getAllChannels, upsertVideos, getChannelVideos,
+  reconcileChannels, reactivateAllChannels, forgetChannel, getAllChannels, upsertVideos, getChannelVideos,
   getFeedCounts, hideChannelVideos, fillMissingAvatars, dropChannelAvatars,
   dropSharedChannelAvatars, setStarred,
   purgeNativeInserted, exportUserData, importUserData, getFeedPulse,
@@ -1289,6 +1289,22 @@ route({
   [MSG.HIDE_CHANNEL]: async ({ channelId, hidden = true }) => ({
     changedIds: await hideChannelVideos(channelId, hidden),
   }),
+
+  /**
+   * The reader says they are not subscribed to this channel any more, and that
+   * is the end of it: no list is read and no guard is consulted. The videos go
+   * with it, because leaving them in place would mean the grid still had rows
+   * to paint and the gesture would look like it had done nothing.
+   */
+  [MSG.FORGET_CHANNEL]: async ({ channelId, key = null }) => {
+    if (!RE_CHANNEL_ID.test(channelId ?? '')) throw new Error('err.channel');
+    if (!await rightAccount(key)) return { otherAccount: true };
+    const { found, title } = await forgetChannel(channelId);
+    if (!found) return { found: false, purged: 0 };
+    const purged = await deleteChannelVideos(channelId);
+    log.info(`Channel ${channelId} (${title}) forgotten by hand, ${purged} videos removed`);
+    return { found: true, purged };
+  },
 
   [MSG.STAR_CHANNEL]: async ({ channelId, starred }) => ({
     changedIds: await setChannelStarred(channelId, starred !== false),

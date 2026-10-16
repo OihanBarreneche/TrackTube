@@ -211,6 +211,16 @@ function paintState(res) {
   lines.push(t('diag.channels', {
     active: stats.activeChannels ?? 0, total: stats.channelCount ?? 0,
   }));
+  // And when that followed count was last compared with YouTube's own list,
+  // because nothing else switches a channel off. "Never" is the answer that
+  // explains a feed full of channels the reader left, and it is the one nobody
+  // could read anywhere before 1.4.3.
+  lines.push(stats.lastListAt
+    ? t('diag.subsList', {
+      n: stats.lastListSize ?? 0,
+      date: new Date(stats.lastListAt).toLocaleString(bcp47(), { dateStyle: 'short', timeStyle: 'short' }),
+    })
+    : t('diag.subsList.never'));
   lines.push(channelWindow ? t('diag.channelWindow', {
     days: channelWindow.windowDays ?? 7, checked: channelWindow.checked ?? 0, total: channelWindow.total ?? 0,
     date: new Date(channelWindow.at).toLocaleString(bcp47(), { dateStyle: 'short', timeStyle: 'short' }),

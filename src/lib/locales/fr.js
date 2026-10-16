@@ -75,6 +75,7 @@ export const fr = {
   'feed.error.mount': 'Montage de la grille impossible',
   'feed.error.hide': 'Masquage impossible, les vidéos sont remises en place.',
   'feed.error.restore': 'Remise en place impossible.',
+  'feed.error.forget': 'Retrait impossible.',
 
   // -- vignette
   'card.channel.only': 'Ne voir que les vidéos de cette chaîne',
@@ -102,6 +103,8 @@ export const fr = {
   'menu.unstar': 'Retirer des priorités',
   'menu.hide.video': 'Masquer cette vidéo',
   'menu.hide.channel': 'Masquer tout de {name}',
+  'menu.forget.channel': 'Je ne suis plus abonné à {name}',
+  'toast.channel.forgotten': '{name} retirée du feed',
 
   // -- messages passagers
   'toast.undo': 'Annuler le masquage',
@@ -277,6 +280,8 @@ export const fr = {
   'diag.harvest.never': 'Feed natif jamais moissonné',
   'diag.harvest.last': 'Dernière passe : {links} liens, {enriched} enrichis',
   'diag.channels': 'Chaînes : {active} suivies, {total} connues',
+  'diag.subsList': 'Liste des abonnements lue le {date} : {n} chaînes',
+  'diag.subsList.never': 'Liste des abonnements jamais lue : rien ne peut retirer une chaîne que tu as quittée',
   'diag.harvest.blind': 'Feed natif : aucune carte lue à la dernière passe',
   'diag.harvest.created': 'Créées depuis le feed natif : {n} · {deferred} en attente · {shorts} Shorts écartés',
   'diag.paused': 'En pause (429) jusqu’à {time}',

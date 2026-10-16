@@ -359,6 +359,36 @@ export async function putChannel(channel) {
 }
 
 /**
+ * Switches one channel off by hand, because the reader says they left it.
+ *
+ * Every other way a channel stops being followed goes through YouTube's
+ * subscription list, and reading that list needs a session cookie the isolated
+ * content world cannot always see — on such a browser `maybeReconcile` returns
+ * before it asks anything, so nothing prunes, ever. Three successive repairs to
+ * the pruning logic were invisible to a reader in that position, who went on
+ * seeing videos from channels they had left for nine days.
+ *
+ * This is the escape hatch, and it is deliberately local: no request, no list,
+ * no guard to satisfy. `missingSince` is left at zero because the decision is
+ * not an observation waiting for confirmation, and a later believable list that
+ * does hold the channel switches it back on through `reconcileChannels` like
+ * any other.
+ *
+ * @returns {Promise<{found: boolean, title: string}>}
+ */
+export async function forgetChannel(channelId) {
+  return withTx(STORE_CHANNELS, 'readwrite', async (tx) => {
+    const store = tx.objectStore(STORE_CHANNELS);
+    const channel = await reqToPromise(store.get(channelId));
+    if (!channel) return { found: false, title: '' };
+    channel.active = 0;
+    channel.missingSince = 0;
+    await reqToPromise(store.put(channel));
+    return { found: true, title: channel.title ?? '' };
+  });
+}
+
+/**
  * Merges an imported subscription list with what we already have: new channels
  * are created, existing ones keep their sync state (etag, pace, counters) and
  * only see title and avatar refreshed. Channels absent from the import are
@@ -1821,7 +1851,7 @@ export async function getFeedCounts(periodsInDays = [1, 7, 30], { withViews = fa
 
 /** Counters for the popup and the audit. */
 export async function getStats() {
-  return withTx([STORE_VIDEOS, STORE_CHANNELS], 'readonly', async (tx) => {
+  return withTx([STORE_VIDEOS, STORE_CHANNELS, STORE_META], 'readonly', async (tx) => {
     const videos = tx.objectStore(STORE_VIDEOS);
     const channels = tx.objectStore(STORE_CHANNELS);
 
@@ -1829,8 +1859,24 @@ export async function getStats() {
     const visible = await reqToPromise(videos.index('by_visible').count(VISIBLE_RANGE));
     const channelCount = await reqToPromise(channels.count());
     const activeChannels = await reqToPromise(channels.index('by_active').count(IDBKeyRange.only(1)));
+    // When YouTube's subscription list was last read and acted upon. Nothing
+    // else switches a channel off, and reading that list needs a session cookie
+    // the isolated world cannot always see — on such a browser the daily
+    // reconciliation returns before asking anything and the active flags are
+    // whatever an old import left behind, for ever, in silence. Three repairs
+    // to the pruning logic were spent before anyone thought to ask whether it
+    // had ever run once. This is that question, answered on screen.
+    const baseline = await reqToPromise(tx.objectStore(STORE_META).get('subs.listBaseline'));
 
-    return { total, visible, hidden: total - visible, channelCount, activeChannels };
+    return {
+      total,
+      visible,
+      hidden: total - visible,
+      channelCount,
+      activeChannels,
+      lastListAt: baseline?.value?.at ?? 0,
+      lastListSize: baseline?.value?.size ?? 0,
+    };
   });
 }
 

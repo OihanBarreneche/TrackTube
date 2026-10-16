@@ -71,6 +71,7 @@ export const en = {
   'feed.error.mount': 'Could not mount the grid',
   'feed.error.hide': 'Could not hide those, they are back in place.',
   'feed.error.restore': 'Could not put those back.',
+  'feed.error.forget': 'Could not remove that channel.',
 
   // -- thumbnail
   'card.channel.only': 'Show only this channel',
@@ -98,6 +99,8 @@ export const en = {
   'menu.unstar': 'Remove from priority',
   'menu.hide.video': 'Hide this video',
   'menu.hide.channel': 'Hide everything from {name}',
+  'menu.forget.channel': 'I no longer follow {name}',
+  'toast.channel.forgotten': '{name} removed from the feed',
 
   // -- transient messages
   'toast.undo': 'Undo hiding',
@@ -273,6 +276,8 @@ export const en = {
   'diag.harvest.never': 'Native feed never harvested',
   'diag.harvest.last': 'Last pass: {links} links, {enriched} enriched',
   'diag.channels': 'Channels: {active} followed, {total} known',
+  'diag.subsList': 'Subscription list read on {date}: {n} channels',
+  'diag.subsList.never': 'Subscription list never read: nothing can remove a channel you left',
   'diag.harvest.blind': 'Native feed: no card read on the last pass',
   'diag.harvest.created': 'Created from the native feed: {n} · {deferred} pending · {shorts} Shorts refused',
   'diag.paused': 'Paused (429) until {time}',

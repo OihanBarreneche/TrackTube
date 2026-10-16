@@ -1,4 +1,4 @@
-# Known limits — 1.4.3
+# Known limits — 1.4.4
 
 Updated October 16, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
@@ -76,6 +76,17 @@ at all.
 A video is also checked against the followed channels when the grid is drawn,
 not only when it is collected: a row outlives the subscription that brought it
 in, and nothing from a channel you no longer follow is painted.
+
+**That check reads a local flag, and only YouTube's subscription list sets it.**
+Reading that list needs a session cookie the isolated content world cannot
+always see — a browser may expose `ytcfg` and withhold `SAPISID` — and when it
+cannot, the daily reconciliation returns before asking anything. Nothing then
+switches a channel off: the flags stay as the last successful import left them,
+and videos from channels you left go on being painted, for as long as that
+lasts. The popup's diagnostics say when the list was last read, and "never" is a
+real answer there. Since 1.4.3 a channel can also be taken out by hand from a
+card's menu, « Je ne suis plus abonné à … », which needs no list and no request:
+it switches the local row off and removes that channel's videos.
 
 Manual refresh reads each active channel's Videos and Live grids for seven days
 with an extra day's margin. It is bounded by 1,200 entries and forty pages per

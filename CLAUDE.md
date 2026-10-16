@@ -217,6 +217,29 @@ feed, which at one a day is **two days**, because the paint guard reads
 « Réimporter depuis YouTube », the attended path, which prunes and purges at
 once.
 
+**And before fixing the pruning logic a fourth time, check that it has ever
+run.** Three repairs went into it over nine days while the reader went on seeing
+a channel they had left, and none of them could have helped, because every one
+of them is downstream of a list the reader's browser may be unable to fetch:
+`maybeReconcile` calls `innertubeAvailable()`, which requires `authorization()`,
+which requires a readable `SAPISID` — and Opera GX is documented three sections
+below as exposing `ytcfg` without it. When that gate fails the function returns,
+silently, and nothing else in the product ever sets `active` to 0. The paint
+guard then reads a flag that nothing maintains, which is the whole explanation
+and it is not a bug in the guard.
+
+The silence was the real defect. The gate now logs why it gave up, `getStats`
+carries `lastListAt` from `subs.listBaseline`, and the popup's diagnostics print
+when the subscription list was last read with **"never"** as a real answer —
+the one line that would have ended this on day one.
+
+And the reader gets a way out that depends on none of it: `FORGET_CHANNEL`, on a
+card's menu as « Je ne suis plus abonné à … », calls `forgetChannel` to switch
+the local row off and `deleteChannelVideos` to take its videos with it. No list,
+no request, no guard to satisfy. Do not route it through `applyToChannel`: that
+helper folds away the exact thumbnails named in `changedIds`, and this removes
+rows no card is showing, so the grid is reloaded instead.
+
 **The reverse audit only judges channels the extension follows.** It used to
 count every dated card of YouTube's subscriptions page that we did not hold,
 which accuses the collector of missing videos it was never asked to fetch —

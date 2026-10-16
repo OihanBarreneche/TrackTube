@@ -446,7 +446,19 @@ async function maybeReconcile() {
 
   const { listSubscriptions, innertubeAvailable } = await import(
     chrome.runtime.getURL('src/content/innertube.js'));
-  if (!await innertubeAvailable()) return;
+  // Said out loud rather than returned in silence. This gate needs a readable
+  // session cookie, and on a browser that exposes `ytcfg` but not `SAPISID` to
+  // the isolated world it is never satisfied — so the only thing that ever
+  // switches a channel off never runs, the active flags stay as an old import
+  // left them, and the feed goes on showing channels the reader left. Nine days
+  // and three repairs to the pruning logic went by without anyone being able to
+  // tell that it had never once executed. The popup's diagnostics now say when
+  // the list was last read; this is the console half of the same answer.
+  if (!await innertubeAvailable()) {
+    log.warn('Subscription reconciliation skipped: no readable YouTube session '
+      + 'on this page, so nothing can deactivate a channel you left');
+    return;
+  }
 
   const { channels, complete } = await listSubscriptions();
   const clean = channels.map(sanitizeChannel).filter(Boolean);

@@ -12,6 +12,10 @@
  */
 
 import { MSG, send } from '../lib/messages.js';
+// Purging a channel's rows is destructive, so it carries the tab's account key
+// like the other destructive paths rather than relying on the worker's
+// "no key means we do not know" tolerance.
+import { activeAccountKey } from './active-account.js';
 import { relativeTime, formatViews, broadcastKind, videoIncomplete } from '../lib/util.js';
 import { t, initLocale, setLocale, bcp47, LANG_KEY } from '../lib/i18n.js';
 import { log } from '../lib/log.js';
@@ -3423,6 +3427,13 @@ function openCardMenu(video, anchor) {
       item(t('menu.hide.video'), () => hideVideos([video.id])),
       item(t('menu.hide.channel', { name: channelName }), () =>
         applyToChannel(MSG.HIDE_CHANNEL, { channelId: video.channelId, hidden: true })),
+      // Last, and after the separator, because it is the only entry here that
+      // removes rows rather than setting them aside — and because it is the
+      // answer to "why am I still seeing a channel I left", which no amount of
+      // pruning logic can give on a browser whose session the extension cannot
+      // read.
+      item(t('menu.forget.channel', { name: channelName }),
+        () => forgetChannel(video.channelId, channelName)),
     );
   }
 
@@ -3491,6 +3502,27 @@ async function applyToChannel(message, payload) {
   flash(t('toast.channel.changed', { n: ids.length }));
   refreshStats();
   loadMore();
+}
+
+/**
+ * "I am not subscribed to this channel any more."
+ *
+ * Deliberately not routed through `applyToChannel`: that one reads
+ * `changedIds` to fold the exact thumbnails away, and this removes every row
+ * the channel has, including the ones no card is showing. The grid is reloaded
+ * instead, which is also what makes the gesture visible — the cards go, and
+ * nothing of that channel comes back on any later page.
+ */
+async function forgetChannel(channelId, channelName) {
+  const res = await send(MSG.FORGET_CHANNEL, { channelId, key: activeAccountKey() });
+  if (!res.ok || res.otherAccount) {
+    log.error('Forgetting the channel failed', res.error ?? 'other account');
+    flash(t('feed.error.forget'));
+    return;
+  }
+  flash(t('toast.channel.forgotten', { name: channelName }));
+  await reload();
+  refreshStats();
 }
 
 /** Fleeting message, for actions with no visible effect on the grid. */
