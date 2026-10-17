@@ -1,4 +1,4 @@
-# Known limits — 1.4.4
+# Known limits — 1.4.5
 
 Updated October 16, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
@@ -116,6 +116,16 @@ verification and approval-cache policies are no longer active. Restoring code
 does not restore an earlier snapshot of browser data or overwritten titles.
 
 ## Hiding
+
+**One browser must hold one copy of TrackTube.** An unpacked copy loaded from a
+folder and the same extension installed from the Store are two different
+origins, so they hold two different databases. Both replace the subscriptions
+page, whichever paints last wins, and hiding a video writes only to the database
+of the copy that owned that card — so the next cold start can be painted by the
+other copy, which never heard about it, and videos come back every morning. From
+inside either database everything is consistent, which is what makes this
+invisible from a diagnostic. Since 1.4.5 the second copy stands down and says so
+in the page console instead of competing.
 
 A hiding is recorded against the video identifier, not only against the row that
 carries it, so a video whose row is deleted and later recollected comes back

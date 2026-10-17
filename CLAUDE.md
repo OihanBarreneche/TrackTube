@@ -624,6 +624,27 @@ of the index, so the migration gives every row a numeric `hiddenAt` before
 building it — a row missing from the bin would be worse than a row in the wrong
 order.
 
+**Two installed copies hold two databases, and the page is how they find out
+about each other.** An unpacked copy loaded from a folder and the same extension
+installed from the Store have different ids, therefore different
+`chrome-extension://<id>/` origins, therefore separate IndexedDB. Both inject
+`loader.js` into YouTube, both replace the subscriptions page, and whichever
+paints last wins. Hiding a video then writes to the database of whichever grid
+owned that card, so a cold start painted by the other copy shows it again, and
+there is nothing in either database to explain it: each one is internally
+consistent, and `setHidden`'s durability is pinned by an assertion that reads a
+hidden row back through a **second IndexedDB connection** rather than the one
+the module caches. That assertion is what ruled the storage layer out, after
+three days of auditing writers that were all correct.
+
+The guard is an attribute on `<html>`, `data-tracktube-owner`, carrying
+`chrome.runtime.id`. It has to be the DOM: each extension's content script runs
+in its own isolated world, so a marker on `window` set by one copy does not
+exist for the other. A different id already present means stand down and say
+so; the same id is re-entrant on purpose, because an extension reload
+re-injects into a document that may still carry our own marker and must not
+disable the extension until the next full page load.
+
 **A hiding is recorded even when there is no row to record it on.** `setHidden`
 read the row, found nothing and moved on, writing nothing at all — and the grid
 can perfectly well hand it an id whose row is gone, because it holds its

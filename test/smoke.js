@@ -1879,6 +1879,38 @@ async function testHiding(check) {
   check('masquage : et elle ne repasse pas dans le feed',
     !stillOut.items.some((v) => v.id === ghost), stillOut.items.length);
 
+  // The morning, in miniature. "I hide videos and they are back when I restart
+  // the browser" is a durability claim, and the module caches its connection,
+  // so reading the row back through that same connection proves nothing about
+  // what a cold start would see. This opens a second connection of its own and
+  // reads the raw record, which is what the next browser session gets.
+  await db.setHidden(['vid00000001'], true);
+  const cold = await new Promise((resolve, reject) => {
+    const open = indexedDB.open(db.DB_NAME, db.DB_VERSION);
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const conn = open.result;
+      const tx = conn.transaction(['videos', 'videoClassifications'], 'readonly');
+      const row = tx.objectStore('videos').get('vid00000001');
+      const mark = tx.objectStore('videoClassifications').get('vid00000001');
+      tx.oncomplete = () => { conn.close(); resolve({ row: row.result, mark: mark.result }); };
+      tx.onerror = () => { conn.close(); reject(tx.error); };
+    };
+  });
+  check('masquage : il survit à une connexion neuve, comme au lendemain matin',
+    cold.row?.hidden === 1 && cold.row.hiddenAt > 0, cold.row && {
+      hidden: cold.row.hidden, hiddenAt: cold.row.hiddenAt,
+    });
+  check('masquage : et le marqueur durable est bien sur le disque',
+    cold.mark?.userHiddenAt > 0, cold.mark);
+  // Read through the composite index a cold feed query actually walks, rather
+  // than by primary key: a row can be present and still be served by the feed
+  // if its index entry says `[0, …]`.
+  const coldFeed = await db.getFeedPage({ limit: 50 });
+  check('masquage : la vidéo masquée est absente du feed lu à froid',
+    !coldFeed.items.some((v) => v.id === 'vid00000001'), coldFeed.items.length);
+  await db.setHidden(['vid00000001'], false);
+
   // Unhiding it must clear the durable marker too, or the video could never
   // come back at all once its row was deleted a second time.
   await db.setHidden([ghost], false);
