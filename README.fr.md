@@ -183,8 +183,13 @@ télémétrie, et aucune analyse d'usage d'aucune sorte.
   identifiant.
 - La sauvegarde est un fichier que tu gardes.
 
-Permissions demandées : `storage`, `unlimitedStorage`, `alarms`, et l'accès à
-`https://www.youtube.com/*`. Rien d'autre. Voir la
+Permissions demandées : `storage`, `unlimitedStorage`, `alarms`,
+`declarativeNetRequestWithHostAccess`, et l'accès à `https://www.youtube.com/*`.
+Rien d'autre. La quatrième existe pour une seule règle : les requêtes que
+l'extension envoie elle même à l'API interne de YouTube portent l'origine de
+YouTube au lieu de celle de l'extension, parce que YouTube les refuse sinon. Elle
+ne touche aucune autre requête et n'ajoute aucun avertissement, puisqu'elle n'agit
+que là où l'accès à YouTube s'applique déjà. Voir la
 [notice de confidentialité](privacy.html), accessible aussi depuis le panneau
 d'aide de la popup.
 

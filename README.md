@@ -172,8 +172,12 @@ no analytics of any kind.
 - It never asks for a password or an API key, and holds no credentials.
 - The backup is a file you keep.
 
-Permissions requested: `storage`, `unlimitedStorage`, `alarms`, and access to
-`https://www.youtube.com/*`. Nothing else. See the
+Permissions requested: `storage`, `unlimitedStorage`, `alarms`,
+`declarativeNetRequestWithHostAccess`, and access to `https://www.youtube.com/*`.
+Nothing else. The fourth one exists for a single rule: the extension's own
+requests to YouTube's internal API carry YouTube's origin rather than the
+extension's, because YouTube refuses them otherwise. It touches no other request
+and adds no warning, since it acts only where the YouTube access already applies. See the
 [privacy notice](privacy.html), also reachable from the popup's help panel.
 
 Watch tracking is **off until you turn it on**. Turning it off later does not

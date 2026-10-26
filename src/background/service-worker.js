@@ -404,6 +404,71 @@ async function repairSharedAvatarsOnce() {
   if (cleared) log.info(`${cleared} incorrect shared channel avatars cleared`);
 }
 
+/**
+ * Id of the one session rule this extension installs. Fixed, so that
+ * re-registering it on every worker start replaces it rather than stacking.
+ */
+const ORIGIN_RULE_ID = 1;
+
+/**
+ * Makes our own internal API requests carry YouTube's origin instead of ours.
+ *
+ * **YouTube refuses every `youtubei` request whose `Origin` is an extension.**
+ * Measured on 26 October 2026, the same player request four times with only
+ * that header changing: no `Origin`, 200; `https://www.youtube.com`, 200;
+ * `chrome-extension://<id>`, **403** with a "Sorry…" page; the same plus the
+ * `Sec-Fetch` headers a browser adds, 403. A worker's `fetch` cannot choose
+ * that header — it is forbidden to scripts — so every call `innertube-direct.js`
+ * made was refused, in every Chromium browser: the player record that is the
+ * only thing able to rule on a Short absent from `UUSH`, the `UUSH` list itself,
+ * and the direct sweep, which then falls back on Atom without a word. Loaded
+ * for real in Opera GX against YouTube, the worker's chain returned `null` for
+ * the player and `null` for `UUSH` while Atom inserted the channel's fifteen
+ * entries, Shorts among them, all with unknown verdicts. That is two months of
+ * Shorts in the feed, and every measurement that said otherwise was taken from
+ * a script that sends no `Origin` at all.
+ *
+ * The rule is scoped to what it has to touch and nothing more:
+ * `initiatorDomains` is this extension, so YouTube's own pages and the content
+ * scripts — whose requests carry the page's origin — never match; the URL is
+ * the internal API and nothing else. The header is set to YouTube's rather than
+ * removed, because that is the value a page on YouTube sends for the very same
+ * request. A session rule and not a static one, because a static ruleset cannot
+ * name its own extension id, which differs between an unpacked copy and the
+ * Store build; session rules are cleared on restart, hence the registration on
+ * every worker start.
+ *
+ * `declarativeNetRequestWithHostAccess` adds no install warning of its own: it
+ * acts only where `https://www.youtube.com/*` already grants access.
+ */
+async function installOriginRule() {
+  if (!chrome.declarativeNetRequest?.updateSessionRules) {
+    log.warn('declarativeNetRequest unavailable: internal API calls will be refused by YouTube');
+    return;
+  }
+  await chrome.declarativeNetRequest.updateSessionRules({
+    removeRuleIds: [ORIGIN_RULE_ID],
+    addRules: [{
+      id: ORIGIN_RULE_ID,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders',
+        requestHeaders: [{ header: 'origin', operation: 'set', value: 'https://www.youtube.com' }],
+      },
+      condition: {
+        urlFilter: '||www.youtube.com/youtubei/',
+        initiatorDomains: [chrome.runtime.id],
+        resourceTypes: ['xmlhttprequest', 'other'],
+      },
+    }],
+  });
+}
+
+// Before anything else that may call the internal API: a refused first request
+// is not retried, it is read as "the interface has changed" and sends the
+// sweep back to Atom.
+installOriginRule().catch((err) => log.warn('Origin rule could not be installed', err));
+
 // Alarms normally survive a worker suspension, but Chrome documents that they
 // may be cleared on a browser restart or an extension reload. `onStartup` alone
 // cannot repair that case once the browser is already running. Every cold worker

@@ -1,4 +1,4 @@
-# Known limits — 1.4.6
+# Known limits — 1.4.7
 
 Updated October 16, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
@@ -100,6 +100,19 @@ age-restricted, region-restricted and members-only videos affect availability.
 There is no official exhaustive-upload contract behind this implementation.
 
 ## Shorts
+
+**Until 1.4.7 Shorts were never recognised by the service worker at all.**
+YouTube answers its internal API with a 403 when a request's `Origin` is an
+extension, and a worker cannot choose that header, so both ways of recognising a
+Short from the worker — the channel's `UUSH` list and the player's canonical
+URL — returned nothing, and the Atom feed inserted everything it carried.
+Measured on 26 October 2026 in Opera GX with the real extension: before, the
+player record and the `UUSH` list both came back empty and a GOTAGA Short was
+inserted; after, `UUSH` was read and recognised in full and the same Short was
+refused. The extension now asks the browser, through one
+`declarativeNetRequest` rule limited to its own requests to that API, to send
+YouTube's origin instead of its own. If YouTube starts refusing that too, the
+same silence comes back, and nothing in the interface would show it.
 
 `UULF` and `UUSH` can contradict the canonical player classification. The public
 case `RJBW_Ad_20A` demonstrated this on October 4, 2026: a confirmed Short was

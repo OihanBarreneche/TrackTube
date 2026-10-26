@@ -19,10 +19,12 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.4.1, audited in October 2026 for a first public release: the README is
-the GitHub landing page, the permissions are down to `storage`,
-`unlimitedStorage`, `alarms` and `https://www.youtube.com/*`, and the welcome
-flow is three steps rather than six.
+Version 1.4.7, audited in October 2026 for a first public release: the README is
+the GitHub landing page, the permissions are `storage`, `unlimitedStorage`,
+`alarms`, `declarativeNetRequestWithHostAccess` and `https://www.youtube.com/*`,
+and the welcome flow is three steps rather than six. The fourth permission came
+back in 1.4.7 for one rule and is explained below; do not remove it to make the
+list look shorter.
 
 A version number is not a certificate. `README.md` and `docs/LIMITES.md` state
 what is not promised, and the one that matters most is that a Short can appear
@@ -93,6 +95,43 @@ runtime, before both Shorts patches. All 60 runtime files match its distribution
 archive exactly. The rejected 0.91.3/0.91.4 code, tests and documentation are
 preserved in the working notes, outside the repository. Do not reintroduce
 the blocking verification or approval-cache policy without a new user request.
+
+**YouTube refuses the worker's internal API requests unless their `Origin` is
+rewritten, and that is what let Shorts through for two months.** Measured on 26
+October 2026, one player request four times with only the header changing: no
+`Origin`, 200; `https://www.youtube.com`, 200; `chrome-extension://<id>`, **403**
+with a "Sorry…" page; the same plus the `Sec-Fetch` headers a browser adds, 403.
+A worker's `fetch` cannot choose that header, so **every** `call()` in
+`innertube-direct.js` was refused, in every Chromium browser: the player record,
+which is the only thing able to rule on a Short absent from `UUSH`; the `UUSH`
+list itself; and the direct sweep, which then falls back on Atom without a word.
+With both layers dead, `withoutShorts` kept everything, every verdict stayed
+unknown, the display screening asked the same refused endpoint, and every
+fix to the Shorts logic in between — including the re-verification just below
+— was correct and changed nothing.
+
+`installOriginRule` in `service-worker.js` registers one `declarativeNetRequest`
+session rule at every worker start: `modifyHeaders`, `origin` set to
+`https://www.youtube.com`, on `||www.youtube.com/youtubei/`, with
+`initiatorDomains` set to `chrome.runtime.id` so that YouTube's own pages and
+the content scripts, whose requests carry the page's origin, never match. A
+session rule because a static ruleset cannot name its own extension id, which
+differs between the unpacked copy and the Store build.
+
+**How this hid for two months is the part to remember.** Every measurement of
+the anonymous path in this file was taken from a Python script, and Python sends
+no `Origin` header, so each one measured a request the extension never sends and
+found it working. It was found by loading the real extension into the reader's
+own browser — Opera GX is installed on the development machine, and unlike
+branded Chrome, which dropped `--load-extension` in 137, it still honours that
+flag — in a throwaway `--user-data-dir`, attaching over the DevTools protocol to
+an extension page, which shares the worker's origin, IndexedDB and host
+permissions, and calling the real modules against the real YouTube. Before the
+rule: player `null`, `UUSH` `null`, fifteen Atom entries inserted with the Short
+among them. After: player `isShort: true`, `UUSH` 100 read and 100 recognised,
+fourteen inserted, the Short tombstoned with no row. **A claim about what the
+extension's requests receive is not checked until it has been checked from the
+extension.**
 
 **A stored row is not a settled question, and that cost a Short in the feed
 every few days.** `withoutShorts` spent its one player record per feed entry
@@ -849,7 +888,9 @@ Measured: ~61 KB gzipped, 394 ms median, **no cache header at all**. Two hundred
 requests at sixteen in flight, zero 429. Extrapolated to 900 channels: 25 seconds
 and 56 MB. The call works **without a session and without cookies** — and it goes
 out with `credentials: 'omit'`, because one does not sign a sweep of the whole
-subscription list.
+subscription list. Those figures were measured from a script; from the worker
+the same call is refused with a 403 unless the `Origin` rule described under the
+Shorts rules is installed, see `installOriginRule`.
 
 It is this path, and this path alone, that sees a video published two minutes
 ago.

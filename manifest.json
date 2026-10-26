@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "TrackTube",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "homepage_url": "https://github.com/OihanBarreneche/TrackTube",
   "description": "A chronological YouTube subscriptions feed without recommendations, with Shorts filtering and a local watchlist.",
   "minimum_chrome_version": "111",
 
-  "permissions": ["storage", "alarms", "unlimitedStorage"],
+  "permissions": ["storage", "alarms", "unlimitedStorage", "declarativeNetRequestWithHostAccess"],
   "host_permissions": ["https://www.youtube.com/*"],
 
   "background": {
