@@ -1,5 +1,5 @@
 {
-  "retrievedAt": "2026-10-07",
+  "retrievedAt": "2026-10-26T01:31:58Z",
   "samples": [
     {
       "microformat": {
@@ -109,6 +109,19 @@
         }
       },
       "expectedShort": true
+    },
+    {
+      "microformat": {
+        "playerMicroformatRenderer": {
+          "publishDate": "2026-10-25T10:04:43-07:00",
+          "canonicalUrl": "https://www.youtube.com/shorts/yjEuPhcexEs"
+        }
+      },
+      "expectedShort": true,
+      "videoDetails": {
+        "lengthSeconds": "78",
+        "videoId": "yjEuPhcexEs"
+      }
     }
   ]
 }

@@ -94,6 +94,35 @@ archive exactly. The rejected 0.91.3/0.91.4 code, tests and documentation are
 preserved in the working notes, outside the repository. Do not reintroduce
 the blocking verification or approval-cache policy without a new user request.
 
+**A stored row is not a settled question, and that cost a Short in the feed
+every few days.** `withoutShorts` spent its one player record per feed entry
+that was `!stored.has(id)` and recent — one attempt per video, ever. An attempt
+coming back inconclusive, which is a refused request or a response with no
+microformat, keeps the video by policy and creates the row; from that moment the
+row itself exempted the video from every later collection pass. The only thing
+left that could recognise the Short was the display screening, which by
+definition runs on what is already painted, so the Short was **guaranteed** at
+least one appearance and stayed until one of its cards happened to sit on screen
+long enough for a second request to succeed.
+
+Measured on 26 October 2026: `yjEuPhcexEs`, 78 seconds, published the day
+before, in its channel's `UULF` and **absent from its `UUSH`** — the
+`RJBW_Ad_20A` shape, where the canonical URL is the only thing that can rule. An
+anonymous player request answers `canonicalUrl: /shorts/…` for it, with the
+client version `innertube-direct.js` hardcodes (`2.20240101.00.00`) exactly as
+with the live one, both verified against YouTube that day, and `UNPLAYABLE`
+without a session changes nothing — `extractPlayerFacts` reads the microformat
+regardless. The verdict was always available and simply never asked for twice.
+
+The condition is now the verdict's own freshness, `hasCurrentVideoVerdict`, the
+same test the display pass applies, which also covers "not stored at all" since
+an absent row has no verdict. Cost is bounded by `shortVerdictLifetime`: three
+hours above 200 seconds, a quarter of an hour below, against a fifteen minute
+cadence and fifteen Atom entries a channel. The assertion for it is in
+`test/collection.js` and it was **checked against the old condition**, where it
+fails with zero player requests — write that proof down before trusting a green
+suite here, because every piece of this chain reads correctly in isolation.
+
 **Paint complete local rows first, verify stale classifications after paint.**
 Feed queries stay local and ordinary cards require duration, not an avatar.
 SCREEN_SHORTS refreshes UUSH and checks stale player verdicts in batches of up

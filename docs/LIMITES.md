@@ -1,4 +1,4 @@
-# Known limits — 1.4.5
+# Known limits — 1.4.6
 
 Updated October 16, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
@@ -103,7 +103,23 @@ There is no official exhaustive-upload contract behind this implementation.
 
 `UULF` and `UUSH` can contradict the canonical player classification. The public
 case `RJBW_Ad_20A` demonstrated this on October 4, 2026: a confirmed Short was
-present in UULF and absent from UUSH.
+present in UULF and absent from UUSH. `yjEuPhcexEs` repeated it on October 26,
+2026, 78 seconds, and both records are kept in
+`test/player-classifications.json`.
+
+On that shape the canonical URL is the only thing that can rule, so the
+verification has to be retried until it answers. Until 1.4.6 it was not: a Short
+whose first player request came back inconclusive was stored, and the stored row
+then exempted it from every later collection pass, because the filter asked
+whether the video was known rather than whether its verdict still held. The only
+thing left that could recognise it was the screening of displayed rows, which by
+definition runs on what is already painted — so such a Short was certain to
+appear at least once, and stayed until one of its cards sat on screen long
+enough for a second request to succeed. An automatic cycle now retries any
+recent row whose verdict has lapsed, before the grid is involved.
+
+A verification that never succeeds still leaves the video visible: nothing is
+withheld on the strength of a failed request, and that remains deliberate.
 
 Confirmed Short exclusions persist and cannot be undone by a provisional
 Videos-tab card. Displayed rows with stale classification are checked after

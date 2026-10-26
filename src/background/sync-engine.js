@@ -22,7 +22,7 @@ import {
 } from './scheduler.js';
 import { pool, MINUTE, HOUR, DAY } from '../lib/util.js';
 import { log } from '../lib/log.js';
-import { shortVerdictLifetime } from '../lib/short-policy.js';
+import { shortVerdictLifetime, hasCurrentVideoVerdict } from '../lib/short-policy.js';
 
 /**
  * Simultaneous requests.
@@ -407,9 +407,37 @@ async function withoutShorts(entries, channelId, { refresh = true } = {}) {
   const kept = entries.filter((e) => !shorts.has(e.id));
   if (!kept.length) return kept;
 
-  const since = Date.now() - VERIFY_SHORT_WINDOW_MS;
+  // **A row already in the store is not a settled question.** This read
+  // `!stored.has(e.id)`, so one attempt was made per video, ever: the entry was
+  // verified on the read that discovered it and never again. An attempt that
+  // came back inconclusive — a refused player request, a response with no
+  // microformat — kept the video, created the row, and with it a permanent
+  // exemption from this pass. From then on the only thing left that could
+  // recognise the Short was the display screening, which by definition runs on
+  // what is already painted, so the Short was guaranteed at least one
+  // appearance in the grid and stayed until a card of it happened to be on
+  // screen long enough for a second request to succeed.
+  //
+  // Measured on 26 October 2026: `yjEuPhcexEs`, 78 seconds, published the day
+  // before, present in its channel's `UULF` and **absent from its `UUSH`** —
+  // the `RJBW_Ad_20A` shape, where the player canonical URL is the only thing
+  // that can rule. An anonymous player request answers
+  // `canonicalUrl: /shorts/…` for it, with the client version this worker
+  // hardcodes as with the live one, so the verdict was always available; it was
+  // simply never asked for a second time.
+  //
+  // The condition is therefore the verdict's own freshness, the same test the
+  // display pass applies, which also covers "not stored at all" since an
+  // absent row has no verdict. Every automatic cycle now retries a recent row
+  // whose verdict has lapsed, without the grid being involved. The cost is
+  // bounded by `shortVerdictLifetime`: three hours for a video over 200
+  // seconds, a quarter of an hour below it, against a cadence of fifteen
+  // minutes and fifteen Atom entries a channel.
+  const now = Date.now();
+  const since = now - VERIFY_SHORT_WINDOW_MS;
   const stored = await getVideosByIds(kept.map((e) => e.id));
-  const unknown = kept.filter((e) => !stored.has(e.id) && e.publishedAt >= since);
+  const unknown = kept.filter((e) => e.publishedAt >= since
+    && !hasCurrentVideoVerdict(stored.get(e.id), now));
   if (!unknown.length) return kept;
 
   const confirmed = new Set();

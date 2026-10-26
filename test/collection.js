@@ -1,6 +1,6 @@
 import * as db from '../src/lib/db.js';
 import { collectChannelWindow } from '../src/content/channel-sweep.js';
-import { ingestAuthenticatedUploads } from '../src/background/sync-engine.js';
+import { ingestAuthenticatedUploads, ingestChannelRssFallback } from '../src/background/sync-engine.js';
 import { screenFeedVideos } from '../src/background/shorts.js';
 import { mergeVideoTabEntries, channelTabBody } from '../src/lib/innertube-parse.js';
 
@@ -150,6 +150,62 @@ export async function run() {
     const audit=await runReverseAudit();
     check('Le diagnostic distingue une vidéo connue mais retenue pour métadonnées',
       audit.missingCount===0 && audit.presentCount===1 && audit.unresolvedCount===1, audit);
+
+    // A Short whose first verification came back inconclusive got a row, and
+    // that row used to exempt it from every later collection pass: the filter
+    // asked whether the video was stored, not whether its verdict still held.
+    // Only the display screening could still recognise it, and that runs on
+    // what is already painted. Measured on 26 October 2026 with yjEuPhcexEs,
+    // 78 seconds, present in its channel's UULF and absent from its UUSH.
+    const lateChannel = 'UC' + 'y'.repeat(22);
+    const lateShort = 'yjEuPhcexEs', lateNormal = 'latenormal1';
+    await db.reconcileChannels([{id: lateChannel, title: 'MVP'}], {complete: false});
+    await db.upsertVideos([
+      // No verdict at all: exactly the row a failed player request leaves.
+      {id: lateShort, channelId: lateChannel, title: 'Short passé entre les mailles',
+        publishedAt: now - 3600e3, durationSec: 78},
+      {id: lateNormal, channelId: lateChannel, title: 'Vidéo ordinaire',
+        publishedAt: now - 3600e3, durationSec: 900},
+    ]);
+    const lateFeed = `<feed><title>Videos</title><yt:channelId>${lateChannel}</yt:channelId>`
+      + [lateShort, lateNormal].map((id) => `<entry><yt:videoId>${id}</yt:videoId>`
+        + `<yt:channelId>${lateChannel}</yt:channelId><title>Entrée</title>`
+        + `<published>${new Date(now - 3600e3).toISOString()}</published>`
+        + '<author><name>MVP</name></author></entry>').join('') + '</feed>';
+    let latePlayerCalls = 0;
+    globalThis.fetch = async (url, opts) => {
+      const target = String(url);
+      if (target === 'https://www.youtube.com/') {
+        return new Response('<script>ytcfg.set({"INNERTUBE_API_KEY":"local_test_key_0123456789012345"});</script>');
+      }
+      if (target.includes('/feeds/videos.xml')) return new Response(lateFeed);
+      if (target.includes('/player')) {
+        latePlayerCalls++;
+        const { videoId } = JSON.parse(opts.body);
+        const short = videoId === lateShort;
+        return Response.json({
+          videoDetails: { videoId, lengthSeconds: short ? '78' : '900' },
+          microformat: { playerMicroformatRenderer: {
+            canonicalUrl: `https://www.youtube.com/${short ? 'shorts/' + videoId : 'watch?v=' + videoId}`,
+            publishDate: new Date(now - 3600e3).toISOString(),
+          } },
+        });
+      }
+      // The companion UUSH list deliberately answers empty: this is the case
+      // where membership cannot settle it and only the canonical URL can.
+      return Response.json({});
+    };
+    await ingestChannelRssFallback(lateChannel);
+    check('Un Short déjà stocké sans verdict est revérifié à la collecte, pas seulement à l’affichage',
+      !(await db.getVideosByIds([lateShort])).has(lateShort), latePlayerCalls);
+    check('La vidéo ordinaire de la même lecture est conservée',
+      (await db.getVideosByIds([lateNormal])).has(lateNormal));
+    // And the verdict just recorded has to stop the requests, or every cycle
+    // would re-ask about every recent row for ever.
+    const settled = latePlayerCalls;
+    await ingestChannelRssFallback(lateChannel);
+    check('Un verdict négatif encore valide évite une nouvelle requête player',
+      latePlayerCalls === settled, {settled, after: latePlayerCalls});
   } finally { globalThis.fetch = originalFetch; }
   return results;
 }
