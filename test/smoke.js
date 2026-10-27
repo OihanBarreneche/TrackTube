@@ -3512,6 +3512,18 @@ async function testListGuard(check) {
     (await db.forgetChannel(channelId(999))).found === false);
   check('oubli : le compte des suivies le reflète',
     (await db.getStats()).activeChannels === (await db.getActiveChannelIds()).size);
+
+  // What the night of 27 October 2026 left behind: a followed channel switched
+  // off by feed 404s, its counter at four. The list holding it wakes it, and the
+  // counter goes with the flag, or the next 404 undid the wake under the old
+  // rule six seconds later.
+  const silenced = channelId(110);
+  await db.putChannel({ ...(await db.getChannel(silenced)), active: 0, failCount: 4 });
+  await db.reconcileChannels(believable, { complete: true });
+  const woken = await db.getChannel(silenced);
+  check('réveil : la liste rallume une chaîne éteinte par des 404 et remet son compteur à zéro',
+    woken.active === 1 && woken.failCount === 0 && woken.nextDueAt === 0,
+    { active: woken.active, failCount: woken.failCount, nextDueAt: woken.nextDueAt });
 }
 
 /**
@@ -3846,9 +3858,17 @@ function testScheduler(check) {
   check('applyOutcome : un succès efface les échecs',
     ok.failCount === 0 && ok.feedHash === 'abc' && ok.nextDueAt > now, ok.failCount);
 
-  const gone = sch.applyOutcome({ ...base, failCount: 2 }, { kind: 'not-found' });
-  check('applyOutcome : trois 404 désactivent la chaîne',
-    gone.failCount === 3 && gone.active === 0, { fail: gone.failCount, active: gone.active });
+  // The night of 27 October 2026: YouTube's feeds answered 404 for 408 of 597
+  // subscribed channels for a couple of hours, and the third 404 switched each
+  // of them off for good. A feed never decides whether the reader follows a
+  // channel, and a 404 buys no back off either.
+  let gone = { ...base, failCount: 2 };
+  for (let i = 0; i < 10; i++) gone = sch.applyOutcome(gone, { kind: 'not-found' }, now);
+  check('applyOutcome : dix 404 de suite laissent la chaîne suivie',
+    gone.active === 1, { fail: gone.failCount, active: gone.active });
+  check('applyOutcome : un 404 ne recule pas la prochaine lecture',
+    gone.failCount === 0 && gone.nextDueAt <= now + sch.SWEEP_DEFAULT + 60_000,
+    { fail: gone.failCount, inMinutes: (gone.nextDueAt - now) / 60_000 });
 
   const limited = sch.applyOutcome(base, { kind: 'rate-limited', retryAfterMs: 60_000 });
   check('applyOutcome : un 429 ne pénalise pas la chaîne',

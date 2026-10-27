@@ -19,7 +19,7 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.4.7, audited in October 2026 for a first public release: the README is
+Version 1.4.8, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are `storage`, `unlimitedStorage`,
 `alarms`, `declarativeNetRequestWithHostAccess` and `https://www.youtube.com/*`,
 and the welcome flow is three steps rather than six. The fourth permission came
@@ -180,6 +180,32 @@ returned when Live is absent, and its recommendations must not be collected.
 The grid rereads above its scroll cursor so late discoveries remain visible.
 Tests cover both collection and display using isolated mocked sources.
 
+**That window read had almost never run, and its fixtures are why nobody
+saw.** `channelTabBody` refused any tab list holding something other than a
+`tabRenderer`, and nearly every channel answer closes its list with Search as
+an `expandableTabRenderer`. Every refused answer sent the channel to the
+playlist fallback, which is `partial` by construction, so every refresh said
+« Collecte partielle » on sweeps where no request had failed. Measured on the
+reader's profile on 27 October 2026: 922 of 934 deep read rows since 14 October
+carried `reason: 'playlist-fallback'`; the 12 others were answers that happened
+to lack the Search tab. The test fixtures built tab lists of `tabRenderer` only,
+so they passed against a shape YouTube does not send. The fixture in
+`test/collection.js` now copies a real answer, Search included. And
+`coverage.reason` in a channel row only ever says `playlist-fallback` once the
+fallback ran, with `videosOk: true` because the fallback's own answer replaced
+the tab's — that is what all 922 said. Since 1.4.8 the row also keeps
+`videosTab` and `livesTab`, the tab reader's own reason (`boundary`, `end`,
+`tab-absent`, `unexpected-tab`, `request-failed`…), so the next such question
+is answered by reading the rows.
+
+How it was found is the method to reuse: copy the extension's IndexedDB folder
+from the reader's browser profile into a throwaway one (the unpacked copy's id
+comes from its path, so the same folder yields the same id and the same
+origin), load the extension there, and read `directCoverage` off every row; then
+open a real YouTube page in a throwaway profile and run the real module inside
+the content script's isolated world over the DevTools protocol. Neither touches
+the reader's own profile, and neither needs their cookies.
+
 **Since 1.3.0 the window sweep also runs by itself, a slice at a time, and the
 button is no longer the only way it happens.** What it costs was measured on 14
 October 2026 against YouTube, over 24 real channels and both of their tabs: a
@@ -307,6 +333,23 @@ the local row off and `deleteChannelVideos` to take its videos with it. No list,
 no request, no guard to satisfy. Do not route it through `applyToChannel`: that
 helper folds away the exact thumbnails named in `changedIds`, and this removes
 rows no card is showing, so the grid is reloaded instead.
+
+**A feed never switches a channel off, and the list guard was not the only
+thing that could.** Until 1.4.8 `applyOutcome` deactivated a channel at its
+third 404, every guard above being about the subscription list, and an
+inactive channel is never read again, so no success could undo it. Overnight on
+26 to 27 October 2026 YouTube's Atom feeds answered 404 for 408 of the reader's
+597 subscriptions, all back to 200 by the morning; the 408 rows were found with
+`failCount: 4`, `missingSince: 0`, last fetched between 00:29 and 00:38 UTC. The
+four, not three, is the other half: `reconcileChannels` at 00:29:14 woke them
+with `nextDueAt: 0` but left the counter, and the read six seconds later was the
+fourth 404. A 404 now resets the counter and keeps the ordinary cadence, a wake
+resets it too, and `reconcileAfterFeedOutageOnce` forgets
+`ytfeed:lastReconcileAt` once so the next YouTube page reads the list and wakes
+exactly what it holds. Do not repair this by waking every row whose counter
+reached three: only the list knows which of them the reader still follows. The
+14 October collapse to 116 active was blamed on bad list reads; nothing
+measured then rules this rule out instead.
 
 **The reverse audit only judges channels the extension follows.** It used to
 count every dated card of YouTube's subscriptions page that we did not hold,

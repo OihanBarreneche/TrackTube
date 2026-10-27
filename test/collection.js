@@ -133,6 +133,28 @@ export async function run() {
       channelTabBody(tabs(home), 'lives').absent===true);
     check('Un onglet Vidéos non sélectionné ne fournit pas les recommandations de Home',
       channelTabBody(tabs(home,{title:'Videos'})).body===null);
+    // The shape YouTube returned for Mister V on 27 October 2026: the Search tab
+    // closes the list as an expandableTabRenderer, and refusing it sent 922 of
+    // 934 deep reads on a real profile to the playlist fallback.
+    const tab = (title, path, extra = {}) => ({tabRenderer: {title,
+      endpoint: {commandMetadata: {webCommandMetadata: {url: `/@mistervofficial/${path}`}}}, ...extra}});
+    const grid = {richGridRenderer: {contents: [card('vraievideo1', '1 day ago')]}};
+    const search = {expandableTabRenderer: {title: 'Search', selected: false,
+      endpoint: {commandMetadata: {webCommandMetadata: {url: '/@mistervofficial/search'}}}}};
+    const realVideos = {contents: {twoColumnBrowseResultsRenderer: {tabs: [
+      tab('Home', 'featured'), tab('Videos', 'videos', {selected: true, content: grid}),
+      tab('Shorts', 'shorts'), tab('Playlists', 'playlists'), tab('Posts', 'posts'), search]}}};
+    check('L’onglet Recherche ne fait plus refuser la réponse de l’onglet Vidéos',
+      channelTabBody(realVideos).body === grid);
+    const realStreams = {contents: {twoColumnBrowseResultsRenderer: {tabs: [
+      tab('Home', 'featured', {selected: true, content: grid}), tab('Videos', 'videos'),
+      tab('Shorts', 'shorts'), tab('Playlists', 'playlists'), tab('Posts', 'posts'), search]}}};
+    check('Sans onglet En direct, la même réponse est lue comme absente et non comme une grille',
+      channelTabBody(realStreams, 'lives').absent === true && channelTabBody(realStreams, 'lives').body === null);
+    const unknownKind = {contents: {twoColumnBrowseResultsRenderer: {tabs: [
+      tab('Videos', 'videos', {selected: true, content: grid}), {mysteryTabRenderer: {title: 'Live'}}]}}};
+    check('Un type d’onglet inconnu refuse toujours, sans certifier une absence',
+      channelTabBody(unknownKind, 'lives').body === null && channelTabBody(unknownKind, 'lives').absent === false);
     globalThis.fetch = async () => Response.json({unknownTemplate:{videoId:'recommend01'}});
     const malformed = await fetchChannelVideosTab(channelId,{since:now-8*86400e3});
     check('Une réponse non reconnue ne donne pas une fausse couverture complète',

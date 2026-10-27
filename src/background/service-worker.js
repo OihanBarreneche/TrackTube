@@ -90,6 +90,10 @@ const META_PURGED_NATIVE = 'maintenance.purgedNativeInserts';
 const META_CHANNELS_WOKEN = 'maintenance.channelsWoken';
 const META_SESSIONS_RESOLVED = 'maintenance.seancesResolues';
 const META_SHARED_AVATARS_CLEARED = 'maintenance.sharedAccountAvatars08813';
+const META_RECONCILE_AFTER_FEED_404 = 'maintenance.reconcileAfterFeed404';
+
+/** Owned by `maybeReconcile` in main.js: when the list was last read. */
+const RECONCILE_KEY = 'ytfeed:lastReconcileAt';
 
 /** The collection cadence has been sized on the list: see applyDefaultCadence. */
 const META_CADENCE_SIZED = 'maintenance.cadenceSized';
@@ -130,9 +134,32 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   await ensureAlarm();
   await purgeNativeInsertsOnce();
   await reactivateSilencedChannelsOnce();
+  await reconcileAfterFeedOutageOnce();
   await resolveOrphanSessionsOnce();
   if (details.reason === 'install') await openWelcome();
 });
+
+/**
+ * One-off repair of the channels a night of feed 404s switched off.
+ *
+ * The scheduler used to switch a channel off at its third 404, and on 27
+ * October 2026 that took 408 of a reader's 597 subscriptions out of the feed
+ * while YouTube's feeds were briefly answering 404 (see `applyOutcome`). The
+ * rule is gone, but the rows it wrote stay switched off until something
+ * switches them back on.
+ *
+ * Asking the subscription list is the repair, rather than waking every channel
+ * the counter reached three on: only the list knows which of them the reader
+ * still follows, and waking a channel they left puts it back in the feed, which
+ * is the complaint this extension hears loudest. Forgetting when the list was
+ * last read makes the next YouTube page read it at once instead of within a
+ * day, and `reconcileChannels` wakes exactly what it holds, counter reset.
+ */
+async function reconcileAfterFeedOutageOnce() {
+  if (await metaGet(META_RECONCILE_AFTER_FEED_404, false)) return;
+  await chrome.storage.local.remove(RECONCILE_KEY);
+  await metaSet(META_RECONCILE_AFTER_FEED_404, true);
+}
 
 /**
  * Opens the welcome screen, once and only once.

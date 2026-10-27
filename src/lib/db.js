@@ -436,7 +436,12 @@ export async function reconcileChannels(imported, { complete = false, confirmAbs
         if (Number.isFinite(inc.subscriberCount)) prev.subscriberCount = inc.subscriberCount;
         if (inc.handle) prev.handle = inc.handle;
         prev.missingSince = 0;
-        if (!prev.active) { prev.active = 1; prev.nextDueAt = 0; }
+        // The counter is reset with the flag. Waking a channel without it once
+        // left a counter of three in place, and the scheduler, which used to
+        // switch a channel off at three, undid this very wake six seconds
+        // later on 27 October 2026. The list saying the reader follows the
+        // channel outranks anything a feed said about it.
+        if (!prev.active) { prev.active = 1; prev.nextDueAt = 0; prev.failCount = 0; }
         await reqToPromise(store.put(prev));
         updated++;
       } else {
@@ -612,6 +617,7 @@ export async function reactivateAllChannels() {
       if (channel.active) continue;
       channel.active = 1;
       channel.missingSince = 0;
+      channel.failCount = 0;
       // Due immediately: the point of the repair is the videos that were not
       // collected while it slept, not the next scheduled turn.
       channel.nextDueAt = 0;

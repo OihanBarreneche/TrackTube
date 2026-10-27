@@ -1,6 +1,6 @@
-# Known limits — 1.4.7
+# Known limits — 1.4.8
 
-Updated October 16, 2026. What follows is what TrackTube does not promise, and
+Updated October 27, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
 they name, and YouTube owes nobody stability on any of them.
 
@@ -88,11 +88,35 @@ real answer there. Since 1.4.3 a channel can also be taken out by hand from a
 card's menu, « Je ne suis plus abonné à … », which needs no list and no request:
 it switches the local row off and removes that channel's videos.
 
+**Until 1.4.8 a feed could switch a subscription off, and one night did it to
+two thirds of a list.** The scheduler treated a third 404 on a channel's upload
+feeds as a deleted channel and deactivated it, and an inactive channel is never
+read again, so nothing could switch it back. Overnight on 26 to 27 October 2026
+YouTube's Atom feeds answered 404 for 408 of a reader's 597 subscriptions, all
+of which answered 200 again by the morning: the 408 were switched off, the
+subscription read at 00:29 UTC that woke them was undone by the next 404, and
+the feed held 189 channels with nothing on screen to say so. Only the
+subscription list now decides whether a channel is followed, a 404 is retried on
+the ordinary cadence, and updating to 1.4.8 makes the next YouTube page read
+the list at once to wake what it holds. The 14 October collapse described above
+was blamed on bad list reads at the time; it may well have been this rule, which
+nobody had looked at then, and nothing kept on that profile can now tell.
+
 Manual refresh reads each active channel's Videos and Live grids for seven days
 with an extra day's margin. It is bounded by 1,200 entries and forty pages per
-source. It reports incomplete walks, deferred metadata and failed requests.
-Older gaps are not recovered by this window alone. The compatibility playlist
-fallback is bounded and never certifies a complete time window.
+source. It reports incomplete walks and failed requests; a page that does not
+come back is asked a second time before it counts as one. Older gaps are not
+recovered by this window alone. The compatibility playlist fallback is bounded
+and never certifies a complete time window.
+
+**Until 1.4.8 that read almost never ran, and every refresh said "partial".**
+Nearly every channel answer ends its tab list with the Search tab, declared as
+a different renderer from the others, and the parser refused any tab list that
+held one. Each channel then fell back on its upload playlist, which proves no
+time coverage, so the sweep was reported partial however well it went. Measured
+on a real profile on 27 October 2026: 922 of 934 channel rows deep read since 14
+October carried that fallback. After the fix, on 32 of that profile's channels
+read for real: 32 covered windows, no fallback, no error.
 
 YouTube's internal browse/player APIs, playlist prefixes and page templates are
 undocumented dependencies. Rate limits, experiment variants, deleted/private,

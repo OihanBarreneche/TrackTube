@@ -431,9 +431,16 @@ export async function fetchChannelVideosTab(
   const tokens = new Set();
 
   for (let round = 0; round < 40 && out.length < max; round++) {
-    const res = await call('browse', token
+    const request = token
       ? { continuation: token }
-       : { browseId: channelId, params: kind === 'lives' ? CHANNEL_STREAMS_PARAMS : CHANNEL_VIDEOS_PARAMS }, { hl: 'en', authenticated: false });
+      : { browseId: channelId, params: kind === 'lives' ? CHANNEL_STREAMS_PARAMS : CHANNEL_VIDEOS_PARAMS };
+    // One second try for a page that did not come back. A full window read is
+    // some two thousand pages on a six hundred channel list (measured on 14
+    // October 2026), and a single one lost was enough to leave its channel's
+    // window uncertified and the whole sweep reported partial. The retry costs
+    // nothing when the first answer arrived.
+    const res = await call('browse', request, { hl: 'en', authenticated: false })
+      ?? await call('browse', request, { hl: 'en', authenticated: false });
     if (!res) { reason = 'request-failed'; break; }
     const selected = channelTabBody(res, kind);
     if (selected.absent) return { videos: [], avatarUrl, ok: true, coveredWindow: true, partial: false, reason: 'tab-absent' };

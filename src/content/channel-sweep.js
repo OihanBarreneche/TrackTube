@@ -24,6 +24,12 @@ export async function collectChannelWindow(channels, {
   const jobs = await pool(channels, concurrency, async (channel) => {
     try {
       let videos = await fetchTab(channel.id, { max: 1200, since, includeAvatar: true });
+      // Kept before the fallback replaces `videos`: the fallback's own answer
+      // carries no reason, so the row used to say `playlist-fallback` and
+      // `videosOk: true` on 922 channels whose tab had been refused, and why
+      // took a reproduction to learn instead of a read.
+      const videosTab = videos.reason ?? null;
+      let livesTab = null;
       let partial = videos.partial === true || videos.coveredWindow !== true;
       if (!videos.ok) {
         videos = await fetchUploads(channel.id, { kind: 'long', max: 100 });
@@ -32,6 +38,7 @@ export async function collectChannelWindow(channels, {
       let live = null;
       if (channel.includeLives !== false) {
         live = await fetchTab(channel.id, { kind: 'lives', max: 1200, since });
+        livesTab = live.reason ?? null;
         if (!live.ok) {
           live = await fetchUploads(channel.id, { kind: 'lives', max: 100 });
           partial = true;
@@ -76,7 +83,8 @@ export async function collectChannelWindow(channels, {
         avatarUrl: videos.avatarUrl ?? null,
         // The checkpoint is scoped to this window, never the whole catalogue.
         coverage: { since, checkedAt: now, partial, videosOk: videos.ok === true,
-          livesOk: live ? live.ok === true : null, reason: videos.reason ?? 'playlist-fallback' },
+          livesOk: live ? live.ok === true : null, reason: videos.reason ?? 'playlist-fallback',
+          videosTab, livesTab },
       });
       if (!result?.ok) throw new Error(result?.error ?? 'persistence-failed');
       tally.checked++;

@@ -441,10 +441,22 @@ export function factsFromVideosTab(video) {
 // Channel requests may return Home when the requested tab does not exist.
 // Never label Home's recommendations as Videos/Live. Continuations do not carry
 // a tab list and keep their declared grid as the source.
+//
+// The Search tab is declared as an `expandableTabRenderer`, not a
+// `tabRenderer`, and it closes the tab list of nearly every channel answer.
+// Requiring every tab to be a `tabRenderer` therefore refused the whole
+// response, and the deep read fell back on the upload playlist for almost every
+// channel. Measured on the reader's profile on 27 October 2026: of 934 channel
+// rows deep read since 14 October, 922 carried that fallback and 12 got
+// through, answers that happened to come without the Search tab. A real Videos
+// answer for Mister V that day: Home, Videos (selected, `richGridRenderer`),
+// Shorts, Playlists, Posts, then Search as `expandableTabRenderer`. An unknown
+// tab kind still refuses: "absent" certifies an empty window, which is only
+// safe to say about a tab list that has been read entirely.
 export function channelTabBody(response, kind = 'videos') {
   const tabs = response?.contents?.twoColumnBrowseResultsRenderer?.tabs;
   if (!Array.isArray(tabs)) return { body: response, absent: false };
-  const renderers = tabs.map(tab => tab.tabRenderer).filter(Boolean);
+  const renderers = tabs.map(tab => tab.tabRenderer ?? tab.expandableTabRenderer).filter(Boolean);
   if (renderers.length !== tabs.length) return { body: null, absent: false };
   const suffix = kind === 'lives' ? '/streams' : '/videos';
   const expected = renderers.find(tab =>

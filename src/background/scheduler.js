@@ -289,9 +289,24 @@ export function applyOutcome(channel, outcome, now = Date.now(), tuning) {
       break;
 
     case 'not-found':
-      // Channel deleted, suspended, or obsolete identifier.
-      next.failCount = (channel.failCount ?? 0) + 1;
-      if (next.failCount >= 3) next.active = 0;
+      // Neither a deactivation nor a back off. A 404 on both upload feeds used
+      // to be read as a deleted channel, and the third one switched it off for
+      // good: an inactive channel is never fetched again, so no success could
+      // ever switch it back on. Measured on the reader's profile on 27 October
+      // 2026: overnight, YouTube answered 404 for 408 of 597 subscribed
+      // channels, all of whose feeds answered 200 again by the morning; all
+      // 408 were switched off, and the subscription read at 00:29 UTC that woke
+      // them was undone six seconds later by the next 404, because waking a
+      // channel did not reset this counter. The feed was left with 189
+      // channels and nothing on screen said so.
+      //
+      // Whether the reader follows a channel is the subscription list's call
+      // and nobody else's: a channel that really was deleted leaves that list,
+      // and `reconcileChannels` switches it off there. Nor is there anything to
+      // save by backing off: a 404 weighs 1612 bytes (measured on 8 October
+      // 2026), and the next publication must arrive on the ordinary cadence the
+      // moment the feed answers again.
+      next.failCount = 0;
       break;
 
     case 'rate-limited':

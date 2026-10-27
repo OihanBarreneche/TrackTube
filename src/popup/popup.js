@@ -693,7 +693,13 @@ onClick('btn-sync', async ({ button }) => {
     const finished = res.result?.started ? await completion : null;
     if (finished?.failed) { report(t('pop.sync.failed', { error: t(finished.error) })); return; }
     const r = finished?.result ?? res.result ?? {};
-    const partial = finished?.partial || r.directUnavailable || r.errors || r.deferred || r.aborted;
+    // The same question the grid's button asks, and only that one: was a
+    // channel left unread. A deferral is one video whose classification has
+    // not settled yet and settles by itself on the next pass; counting it here
+    // said "partial" in the popup after a sweep the grid called complete.
+    const partial = finished
+      ? finished.channelsMissed === true
+      : Boolean(r.directUnavailable || r.errors || r.aborted);
     progress.querySelector('.label').textContent = t(partial ? 'pop.sync.partial' : 'pop.sync.result',
       { checked: r.checked ?? 0, inserted: r.inserted ?? 0 });
   } finally {
