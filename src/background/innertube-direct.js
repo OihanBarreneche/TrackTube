@@ -38,6 +38,7 @@
 import { log } from '../lib/log.js';
 import {
   extractPlaylistVideos, extractOwnerAvatar, extractContinuation, extractPlayerFacts,
+  channelTabBody, mergeVideoTabEntries, extractSubscriptionFeedVideos,
 } from '../lib/innertube-parse.js';
 
 const ORIGIN = 'https://www.youtube.com';
@@ -172,6 +173,32 @@ export async function fetchUploadsDirect(channelId, { kind = 'long', signal } = 
     if (!token) break;
   }
   return { videos, avatarUrl, partial: Boolean(token) };
+}
+
+/** The params YouTube's own Videos tab sends, as `innertube.js` does. */
+const CHANNEL_VIDEOS_PARAMS = 'EgZ2aWRlb3PyBgQKAjoA';
+
+/**
+ * The first page of a channel's real Videos tab, read from the worker.
+ *
+ * The same request the tab's window sweep makes — public, no cookie, the same
+ * parsers — so that the one piece of evidence the product trusts to lift a
+ * Members badge, an unbadged card in that tab, can be had without waiting for
+ * a tab to be open on the subscriptions page. One page only: it serves to look
+ * at recent cards, not to walk a window.
+ *
+ * @returns {Promise<Array<object> | null>} `null` when the answer cannot be
+ *   read, which callers must treat as "nothing learned".
+ */
+export async function fetchChannelVideosTabDirect(channelId, { signal } = {}) {
+  if (!RE_CHANNEL_ID.test(channelId)) return null;
+  const res = await call('browse', { browseId: channelId, params: CHANNEL_VIDEOS_PARAMS }, signal);
+  if (!res) return null;
+  const selected = channelTabBody(res, 'videos');
+  if (!selected.body) return null;
+  return mergeVideoTabEntries(
+    extractSubscriptionFeedVideos(selected.body), extractPlaylistVideos(selected.body),
+  );
 }
 
 /**

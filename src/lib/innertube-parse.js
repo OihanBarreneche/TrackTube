@@ -339,7 +339,12 @@ export function extractPlayerFacts(player, expectedId = player?.videoDetails?.vi
     isUpcoming: Boolean(broadcast && !broadcast.isLiveNow && !broadcast.endTimestamp),
     wasLive: Boolean(det?.isLiveContent),
     isShort: isShort(player, expectedId),
-    membersOnly: /members?[- ]only|join (?:this|the) channel|available to members/i.test(restriction),
+    // Two wordings, both measured on 30 October 2026 from an anonymous player
+    // over six videos a Videos tab had badged: "Join this channel to get
+    // access to members-only content…" on four, and "This video is available
+    // to this channel's members on level: …" on two, which the former pattern
+    // missed. A public video answered "Video unavailable" on the same request.
+    membersOnly: /members?[- ]only|join (?:this|the) channel|available to (?:this channel's )?members/i.test(restriction),
   };
 }
 
@@ -464,6 +469,32 @@ export function channelTabBody(response, kind = 'videos') {
     || tab.title === (kind === 'lives' ? 'Live' : 'Videos'));
   if (!expected) return { body: null, absent: true };
   return { body: expected.selected ? expected.content : null, absent: false };
+}
+
+/**
+ * A selected channel tab that says, in so many words, that it holds nothing.
+ *
+ * A channel that once streamed keeps its Live tab after the streams are gone,
+ * and YouTube answers it with a `sectionListRenderer` holding one
+ * `channelOwnerEmptyStateRenderer`, "This channel has no videos." No grid is
+ * declared, so the reader called it an unrecognised response and sent the
+ * channel to the playlist fallback, which is partial by construction. Measured
+ * on a real profile on 30 October 2026: 11 of 597 channels refused that way,
+ * the three read again the same morning all of this shape, and the sweep
+ * reported « Collecte partielle » with 597 of 597 channels read.
+ *
+ * Strict on purpose: an empty tab certifies an empty window, so every item of
+ * the list has to be that renderer, possibly inside an `itemSectionRenderer`.
+ * Anything else stays unrecognised.
+ */
+export function isEmptyChannelTab(body) {
+  const contents = body?.sectionListRenderer?.contents;
+  if (!Array.isArray(contents) || !contents.length) return false;
+  const empty = (item) => Boolean(item?.channelOwnerEmptyStateRenderer)
+    || (Array.isArray(item?.itemSectionRenderer?.contents)
+      && item.itemSectionRenderer.contents.length > 0
+      && item.itemSectionRenderer.contents.every((inner) => Boolean(inner?.channelOwnerEmptyStateRenderer)));
+  return contents.every(empty) && !hasDeclaredVideoGrid(body);
 }
 
 export function hasDeclaredVideoGrid(node) {

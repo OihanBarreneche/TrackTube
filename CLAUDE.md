@@ -19,7 +19,7 @@ Git configuration. See `AGENTS.md`.
 
 ## Current state
 
-Version 1.4.8, audited in October 2026 for a first public release: the README is
+Version 1.4.9, audited in October 2026 for a first public release: the README is
 the GitHub landing page, the permissions are `storage`, `unlimitedStorage`,
 `alarms`, `declarativeNetRequestWithHostAccess` and `https://www.youtube.com/*`,
 and the welcome flow is three steps rather than six. The fourth permission came
@@ -197,6 +197,31 @@ the tab's — that is what all 922 said. Since 1.4.8 the row also keeps
 `videosTab` and `livesTab`, the tab reader's own reason (`boundary`, `end`,
 `tab-absent`, `unexpected-tab`, `request-failed`…), so the next such question
 is answered by reading the rows.
+
+**An empty tab is an answer, and so is a badge that has gone.** Two more
+shapes, both read off the same profile on 30 October 2026. A Live tab that
+exists with no stream left answers a `sectionListRenderer` holding only
+`channelOwnerEmptyStateRenderer` ("This channel has no videos."), and it made
+11 of 597 channels partial on every sweep; `isEmptyChannelTab` reads it as a
+covered empty window, strictly, because "empty" certifies coverage. The
+message then said « Collecte partielle · 597/597 chaînes lues », a warning and
+a figure that contradicted it: it now counts `checked - partial`, the windows
+actually verified. And a Members flag was only ever lifted by the tab's window
+sweep, so a Members first video that went public stayed refused by
+`upsertVideos` until that sweep came round — `GX6AdHXAfY4`, fifteen and a half
+hours while every other video of those two days arrived in one to thirty nine
+minutes. `releasePublicMembersFirst` reads the channel's Videos tab from the
+worker when a recent Atom entry carries the flag, at most every half hour, and
+lifts it on an unbadged card only; on four channels with real members-only
+videos the worker read every flagged card still badged. The anonymous player
+also says "available to this channel's members on level: …", which the
+`membersOnly` pattern missed.
+
+Before calling automatic collection slow, separate the browser being closed
+from the extension being late: `discoveredAt` against `publishedAt`, with the
+`live` history rows as the witness that the browser was open. On that profile
+the hours of delay the reader saw were all closed browser or the 27 October
+deactivations, bar the one above.
 
 How it was found is the method to reuse: copy the extension's IndexedDB folder
 from the reader's browser profile into a throwaway one (the unpacked copy's id

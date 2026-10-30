@@ -2280,6 +2280,18 @@ export async function recordMembersOnly(id, membersOnly, at = Date.now()) {
   });
 }
 
+/** The ids among these that carry a Members flag, which `upsertVideos` refuses. */
+export async function membersOnlyIds(ids) {
+  return withTx(STORE_SHORTS, 'readonly', async (tx) => {
+    const found = new Set();
+    for (const id of ids) {
+      const verdict = await reqToPromise(tx.objectStore(STORE_SHORTS).get(id));
+      if (verdict?.membersOnly === true) found.add(id);
+    }
+    return found;
+  });
+}
+
 export async function knownShortIds(ids) {
   return withTx(STORE_SHORTS, 'readonly', async (tx) => {
     const found = new Set();

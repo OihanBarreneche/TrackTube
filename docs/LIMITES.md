@@ -1,6 +1,6 @@
-# Known limits — 1.4.8
+# Known limits — 1.4.9
 
-Updated October 27, 2026. What follows is what TrackTube does not promise, and
+Updated October 30, 2026. What follows is what TrackTube does not promise, and
 why. Measurements are dated: they were true on the day they name, on the videos
 they name, and YouTube owes nobody stability on any of them.
 
@@ -108,6 +108,25 @@ source. It reports incomplete walks and failed requests; a page that does not
 come back is asked a second time before it counts as one. Older gaps are not
 recovered by this window alone. The compatibility playlist fallback is bounded
 and never certifies a complete time window.
+
+A Live tab that exists but is empty — a channel that once streamed and whose
+streams are gone — is answered with "This channel has no videos." Until 1.4.9
+that answer was not recognised, the channel went to the fallback, and the sweep
+said partial with every channel read: 11 of 597 on one profile on 30 October
+2026. It now counts as a covered, empty window. The warning, when it does
+appear, gives the channels whose window was verified rather than those read.
+
+Automatic collection only runs while the browser does. Measured on one profile
+over 28 to 30 October 2026: while the browser was open, every video but one
+arrived one to thirty nine minutes after publication, most within fifteen —
+the Atom feeds' quarter hour of cache plus the cadence. What was published
+while it was closed arrived within minutes of the next start, so YouTube's own
+pages, on another device or the moment the browser opens, can show it hours
+before the grid does. The one exception was a Members first video: flagged
+while it was reserved, it stayed refused after going public until the window
+sweep came round, fifteen and a half hours. Since 1.4.9 a recent feed entry
+held by that flag makes the worker read the channel's Videos tab, at most once
+per half hour, and an unbadged card lifts it.
 
 **Until 1.4.8 that read almost never ran, and every refresh said "partial".**
 Nearly every channel answer ends its tab list with the Search tab, declared as

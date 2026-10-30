@@ -700,8 +700,14 @@ onClick('btn-sync', async ({ button }) => {
     const partial = finished
       ? finished.channelsMissed === true
       : Boolean(r.directUnavailable || r.errors || r.aborted);
-    progress.querySelector('.label').textContent = t(partial ? 'pop.sync.partial' : 'pop.sync.result',
-      { checked: r.checked ?? 0, inserted: r.inserted ?? 0 });
+    // Certified channels in the warning, as in the grid: a channel read through
+    // the fallback is read but not verified.
+    progress.querySelector('.label').textContent = partial
+      ? t('pop.sync.partial', {
+        checked: Math.max(0, (r.checked ?? 0) - (Number(r.partial) || 0)),
+        total: r.total ?? r.checked ?? 0, inserted: r.inserted ?? 0,
+      })
+      : t('pop.sync.result', { checked: r.checked ?? 0, inserted: r.inserted ?? 0 });
   } finally {
     clearTimeout(syncCompletion?.timer); syncCompletion = null;
     syncProgressId = null;

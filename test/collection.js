@@ -2,7 +2,9 @@ import * as db from '../src/lib/db.js';
 import { collectChannelWindow } from '../src/content/channel-sweep.js';
 import { ingestAuthenticatedUploads, ingestChannelRssFallback } from '../src/background/sync-engine.js';
 import { screenFeedVideos } from '../src/background/shorts.js';
-import { mergeVideoTabEntries, channelTabBody } from '../src/lib/innertube-parse.js';
+import {
+  mergeVideoTabEntries, channelTabBody, isEmptyChannelTab, extractPlayerFacts,
+} from '../src/lib/innertube-parse.js';
 
 export async function run() {
   const results = [];
@@ -159,6 +161,32 @@ export async function run() {
     const malformed = await fetchChannelVideosTab(channelId,{since:now-8*86400e3});
     check('Une réponse non reconnue ne donne pas une fausse couverture complète',
       !malformed.ok && malformed.partial, malformed);
+    // The Live tab of a channel whose streams are all gone, as YouTube answered
+    // it for 11 of 597 channels on 30 October 2026: selected, and empty in so
+    // many words. It used to fall back on the playlist and make every sweep
+    // report « Collecte partielle » with 597 of 597 channels read.
+    const emptyState = {sectionListRenderer: {contents: [{channelOwnerEmptyStateRenderer: {
+      description: {simpleText: 'This channel has no videos.'}}}], disablePullToRefresh: true}};
+    globalThis.fetch = async () => Response.json({contents: {twoColumnBrowseResultsRenderer: {tabs: [
+      tab('Home', 'featured'), tab('Videos', 'videos'),
+      tab('Live', 'streams', {selected: true, content: emptyState}), tab('Playlists', 'playlists'), search]}}});
+    const emptyLive = await fetchChannelVideosTab(channelId, {kind: 'lives', since: now - 8 * 86400e3});
+    check('Un onglet En direct vide est une fenêtre couverte, sans secours ni « partielle »',
+      emptyLive.ok && emptyLive.coveredWindow && !emptyLive.partial && emptyLive.reason === 'tab-empty'
+        && emptyLive.videos.length === 0, emptyLive);
+    check('Une liste de sections qui contient autre chose qu’un état vide reste non reconnue',
+      !isEmptyChannelTab({sectionListRenderer: {contents: [emptyState.sectionListRenderer.contents[0],
+        {itemSectionRenderer: {contents: [{messageRenderer: {text: {simpleText: 'Try again'}}}]}}]}}));
+    // The anonymous player's two wordings for a members-only video, read on 30
+    // October 2026, and its answer for a public one on the same request.
+    const playerSays = (reason) => extractPlayerFacts({playabilityStatus: {status: 'UNPLAYABLE', reason},
+      videoDetails: {videoId: 'membcheck01', lengthSeconds: '600'},
+      microformat: {playerMicroformatRenderer: {canonicalUrl: 'https://www.youtube.com/watch?v=membcheck01'}}},
+      'membcheck01').membersOnly;
+    check('Le lecteur reconnaît les deux formulations Membres et pas une vidéo publique',
+      playerSays('Join this channel to get access to members-only content like this video, and other exclusive perks.')
+        && playerSays('This video is available to this channel\'s members on level: Bonus (or any higher level).')
+        && !playerSays('Video unavailable'));
 
     await db.upsertVideos([{id:'dateapprox1',channelId,publishedAt:now,publishedAtApprox:true,durationSec:300}]);
     await db.upsertVideos([{id:'dateapprox1',channelId,publishedAt:now-3600000,source:'rss'}]);
@@ -228,6 +256,62 @@ export async function run() {
     await ingestChannelRssFallback(lateChannel);
     check('Un verdict négatif encore valide évite une nouvelle requête player',
       latePlayerCalls === settled, {settled, after: latePlayerCalls});
+
+    // A Members first video: flagged while reserved, public later, and carried
+    // by Atom from then on. The flag used to be lifted only by the tab's window
+    // sweep, which reached GX6AdHXAfY4 fifteen and a half hours after the feed
+    // did on 28 October 2026. An unbadged Videos tab card read at collection
+    // lifts it now; a badged one, or no answer, does not.
+    const memberChannel = 'UC' + 'z'.repeat(22);
+    const memberVideo = 'membfirst01';
+    await db.reconcileChannels([{id: memberChannel, title: 'JDE'}], {complete: false});
+    await db.recordMembersOnly(memberVideo, true, now - 86400e3);
+    const memberFeed = `<feed><title>Videos</title><yt:channelId>${memberChannel}</yt:channelId>`
+      + `<entry><yt:videoId>${memberVideo}</yt:videoId><yt:channelId>${memberChannel}</yt:channelId>`
+      + `<title>Le Journal</title><published>${new Date(now - 2 * 3600e3).toISOString()}</published>`
+      + '<author><name>JDE</name></author></entry></feed>';
+    let badged = true, tabReads = 0, tabAnswers = true;
+    globalThis.fetch = async (url, opts) => {
+      const target = String(url);
+      if (target === 'https://www.youtube.com/') {
+        return new Response('<script>ytcfg.set({"INNERTUBE_API_KEY":"local_test_key_0123456789012345"});</script>');
+      }
+      if (target.includes('/feeds/videos.xml')) return new Response(memberFeed);
+      const body = JSON.parse(opts.body);
+      if (target.includes('/player')) {
+        return Response.json({ videoDetails: { videoId: body.videoId, lengthSeconds: '1097' },
+          microformat: { playerMicroformatRenderer: {
+            canonicalUrl: `https://www.youtube.com/watch?v=${body.videoId}`,
+            publishDate: new Date(now - 2 * 3600e3).toISOString() } } });
+      }
+      if (body.params === 'EgZ2aWRlb3PyBgQKAjoA') {
+        tabReads++;
+        if (!tabAnswers) return new Response('{}', {status: 503});
+        const renderer = {videoId: memberVideo, title: {simpleText: 'Le Journal'},
+          publishedTimeText: {simpleText: '2 hours ago'}, lengthText: {simpleText: '18:17'},
+          ...(badged ? {badges: [{metadataBadgeRenderer: {style: 'BADGE_STYLE_TYPE_MEMBERS_ONLY',
+            label: 'Members first'}}]} : {})};
+        return Response.json({contents: {twoColumnBrowseResultsRenderer: {tabs: [
+          tab('Videos', 'videos', {selected: true, content: {richGridRenderer: {contents: [
+            {richItemRenderer: {content: {videoRenderer: renderer}}}]}}}), search]}}});
+      }
+      return Response.json({});
+    };
+    const memberRow = async () => (await db.getVideosByIds([memberVideo])).has(memberVideo);
+    await ingestChannelRssFallback(memberChannel);
+    check('Encore badgée Membres dans l’onglet Vidéos, la vidéo reste refusée',
+      !(await memberRow()) && tabReads === 1, tabReads);
+    await ingestChannelRssFallback(memberChannel);
+    check('L’onglet n’est pas redemandé avant la demi heure', tabReads === 1, tabReads);
+    await db.metaSet(`members.recheck.${memberChannel}`, {nextAt: 0});
+    badged = false; tabAnswers = false;
+    await ingestChannelRssFallback(memberChannel);
+    check('Un onglet qui ne répond pas ne lève rien', !(await memberRow()) && tabReads === 2, tabReads);
+    await db.metaSet(`members.recheck.${memberChannel}`, {nextAt: 0});
+    tabAnswers = true;
+    await ingestChannelRssFallback(memberChannel);
+    check('Devenue publique, elle entre à la lecture Atom suivante sans attendre le balayage',
+      await memberRow(), tabReads);
   } finally { globalThis.fetch = originalFetch; }
   return results;
 }

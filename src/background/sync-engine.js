@@ -10,9 +10,9 @@
 import {
   getDueChannels, putChannel, upsertVideos, metaGet, metaSet, getAllChannels, getChannel,
   allVideoIds, existingVideoIds, getVideosSince, getVideosByIds, knownShortIds,
-  recordVideoClassification, recordMembersOnly,
+  recordVideoClassification, recordMembersOnly, membersOnlyIds,
 } from '../lib/db.js';
-import { fetchUploadsDirect } from './innertube-direct.js';
+import { fetchUploadsDirect, fetchChannelVideosTabDirect } from './innertube-direct.js';
 import {
   fetchScreenedVideoFacts as fetchVideoFacts, refreshChannelShorts, announceGone,
 } from './shorts.js';
@@ -451,6 +451,56 @@ async function withoutShorts(entries, channelId, { refresh = true } = {}) {
   return kept.filter((e) => !confirmed.has(e.id));
 }
 
+/** How often a channel's Videos tab may be asked about a Members flag. */
+const MEMBERS_RECHECK_MS = 30 * MINUTE;
+
+/**
+ * Lifts the Members flag of a recent feed entry whose Videos tab card no
+ * longer carries the badge.
+ *
+ * `upsertVideos` refuses an id flagged Members, which is right while the video
+ * is reserved, and that flag was only ever lifted by the tab's window sweep
+ * reading the card unbadged. The sweep comes round each channel about every two
+ * and a half hours of browsing on the subscriptions page, and not at all while
+ * nobody is on it. Read off the reader's profile on 30 October 2026:
+ * `GX6AdHXAfY4`, public at 17:00:11 UTC on the 28th, was in its channel's Atom
+ * feed by the 17:18 read — the channel row's `lastChangeAt` and `lastUploadAt`
+ * say so — and its row was created at 08:45 the next morning by the window
+ * sweep, fifteen and a half hours later. Of the two refusals in
+ * `upsertVideos`, a Short verdict is permanent and this one is not, so the
+ * Members flag is what held it. Over the two days before, it was the only
+ * video of 597 channels that late while the browser was open; everything else
+ * arrived in one to thirty nine minutes.
+ *
+ * The evidence is the one the sweep already trusts, an unbadged card in the
+ * real Videos tab, read from the worker with the same request and the same
+ * parsers. A card still badged, a card not found, or a request that fails
+ * leaves the flag as it is: nothing here admits a video on the strength of a
+ * missing answer. Asked once per half hour per channel, and only while its
+ * feed carries a recent flagged entry, which on that profile is a handful of
+ * channels at most.
+ */
+async function releasePublicMembersFirst(entries, channelId) {
+  const since = Date.now() - VERIFY_SHORT_WINDOW_MS;
+  const recent = entries.filter((e) => e.publishedAt >= since).map((e) => e.id);
+  if (!recent.length) return 0;
+  const flagged = await membersOnlyIds(recent);
+  if (!flagged.size) return 0;
+  const key = `members.recheck.${channelId}`;
+  if ((await metaGet(key, {}))?.nextAt > Date.now()) return 0;
+  await metaSet(key, { nextAt: Date.now() + MEMBERS_RECHECK_MS });
+  const cards = await fetchChannelVideosTabDirect(channelId);
+  if (!cards) return 0;
+  let released = 0;
+  for (const card of cards) {
+    if (!flagged.has(card.id) || card.membersOnly !== false) continue;
+    await recordMembersOnly(card.id, false, Date.now());
+    released++;
+  }
+  if (released) log.info(`Members flag lifted at collection: ${released} on ${channelId}`);
+  return released;
+}
+
 /**
  * Synchronises one channel: fetch, change detection, insertion, then update of
  * its scheduling state.
@@ -530,6 +580,7 @@ async function syncChannel(channel, tuning = 1, { lives = true, overflow = null 
     // channel doubled the ordinary automatic sweep. The separate residual pass
     // still catches a video YouTube reclassifies after publication.
     const kept = await withoutShorts(entries, channel.id, { refresh: verdict.kind === 'ok' });
+    await releasePublicMembersFirst(kept, channel.id);
     const written = await upsertVideos(kept.map((e) => ({
       id: e.id,
       channelId: e.channelId || channel.id,
@@ -790,6 +841,7 @@ async function collectDatedFeed(channel, known, { refreshShorts = true } = {}) {
   if (res.status !== 'ok') return { inserted: 0, updated: 0, ok: false };
 
   const entries = await withoutShorts(res.feed.entries, channel.id, { refresh: refreshShorts });
+  await releasePublicMembersFirst(entries, channel.id);
   const written = await upsertVideos(entries.map((e) => ({
     id: e.id,
     channelId: e.channelId || channel.id,

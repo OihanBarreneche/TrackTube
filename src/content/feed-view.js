@@ -1103,9 +1103,14 @@ async function runManualRefresh() {
     setRefreshProgress(1);
     await refreshStats();
     if (partial) {
+      // The channels whose window was certified, not the channels read. It
+      // printed `checked`, which counts a channel read through the fallback
+      // too, and so said « Collecte partielle · 597/597 chaînes lues » on 30
+      // October 2026: a warning and a figure that contradicted it.
       freshness.textContent = t('feed.sync.partial', {
-        checked: detail?.checked ?? 0,
+        checked: Math.max(0, (detail?.checked ?? 0) - (detail?.partial ?? 0)),
         total: detail?.total ?? 0,
+        days: detail?.windowDays ?? 7,
       });
     }
   } catch (err) {

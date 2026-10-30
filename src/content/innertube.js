@@ -32,7 +32,7 @@ import { log } from '../lib/log.js';
 import { parseCompactCount } from '../lib/util.js';
 import {
   readText, extractPlaylistVideos, extractContinuation, extractOwnerAvatar,
-  mergeVideoTabEntries, channelTabBody, hasDeclaredVideoGrid,
+  mergeVideoTabEntries, channelTabBody, hasDeclaredVideoGrid, isEmptyChannelTab,
   extractHistorySections, parseHistoryDay, extractSubscriptionFeedVideos, extractPlayerFacts,
 } from '../lib/innertube-parse.js';
 
@@ -446,6 +446,9 @@ export async function fetchChannelVideosTab(
     if (selected.absent) return { videos: [], avatarUrl, ok: true, coveredWindow: true, partial: false, reason: 'tab-absent' };
     if (!selected.body) { reason = 'unexpected-tab'; break; }
     if (includeAvatar) avatarUrl ??= extractOwnerAvatar(res);
+    if (!token && isEmptyChannelTab(selected.body)) {
+      return { videos: [], avatarUrl, ok: true, coveredWindow: true, partial: false, reason: 'tab-empty' };
+    }
 
     // Channel tabs currently use rich-grid videoRenderer/lockup cards, while
     // older responses used playlist renderers. Read the declared grid first;
